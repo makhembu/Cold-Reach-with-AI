@@ -142,6 +142,7 @@ export const analyzeWebsiteWithGemini = async (
   const $ = load(rawHtml);
   const generator = $('meta[name="generator"]').attr('content') || 'Unknown';
   const hasHttps = business.website.startsWith('https');
+  const hasVisuals = lighthouseResults.some(lr => lr.screenshot);
 
   // Format Lighthouse findings for context
   const auditSummary = lighthouseResults.map((lr, index) => `
@@ -166,7 +167,7 @@ export const analyzeWebsiteWithGemini = async (
     ${rawHtml.substring(0, 1000)}...
 
     Task 1: Visual & Technical Analysis (Based on Screenshots & Audit Data)
-    - Analyze the provided screenshots (Home + internal pages if available).
+    ${hasVisuals ? '- Analyze the provided screenshots (Home + internal pages if available).' : '- NO SCREENSHOTS AVAILABLE. Base your design critique solely on the HTML structure, Lighthouse metrics, and industry standards for this category.'}
     - Critique the design modernity, mobile responsiveness, and user journey.
     - Reference the specific Lighthouse failures (e.g. if Performance is low, mention why).
     
