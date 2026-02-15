@@ -1,29 +1,17 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, CheckCircle2, AlertTriangle, Shield, Smartphone, Monitor, Loader2, Lock, Search, Code, Terminal, Server, Layers, Globe, Eye, History, Bug, Skull } from 'lucide-react';
+import { Play, CheckCircle2, AlertTriangle, Shield, Smartphone, Monitor, Loader2, Lock, Search, Code, Terminal, Server, Layers, Globe, Eye, History, Bug, Skull, Zap, Gauge } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
 import { performFullAudit } from '../services/api';
+import { runLighthouseAudit, extractRelevantLinks } from '../services/simulation';
 import { analyzeWebsiteWithGemini, findAndVerifyEmail } from '../services/geminiService';
-import { Business, BusinessStatus, AnalysisResult } from '../types';
+import { Business, BusinessStatus, AnalysisResult, LighthouseData } from '../types';
 
 const TechBadge: React.FC<{ label: string }> = ({ label }) => (
   <span className="px-2 py-1 bg-slate-800 text-slate-200 text-xs rounded font-mono border border-slate-700">
     {label}
   </span>
 );
-
-const ScoreCard = ({ label, score, icon: Icon }: any) => {
-  let color = 'text-green-600';
-  if (score < 50) color = 'text-red-600';
-  else if (score < 75) color = 'text-yellow-600';
-
-  return (
-    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
-      <Icon size={20} className="mb-2 text-slate-400" />
-      <span className={`text-xl font-bold ${color}`}>{score}</span>
-      <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{label}</span>
-    </div>
-  );
-};
 
 const VulnerabilityCard = ({ vuln }: { vuln: any }) => (
   <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
@@ -68,7 +56,7 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
     </div>
 
     <div className="p-6 flex flex-col lg:flex-row gap-6">
-      <div className="lg:w-1/3 shrink-0">
+      <div className="lg:w-1/3 shrink-0 space-y-4">
          {screenshot ? (
            <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden bg-white relative group">
               <img src={screenshot} alt="Site Screenshot" className="w-full" />
@@ -84,10 +72,10 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
              </div>
            </div>
          )}
-         
+
          {/* Security Summary */}
          {result.security && (
-           <div className="mt-4">
+           <div>
              <h5 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-2">
                <Shield size={12} /> Active Vulnerability Scan
              </h5>
@@ -119,17 +107,9 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
           </div>
         )}
 
-        {/* Scores */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <ScoreCard label="UX / UI" score={result.uxScore} icon={Monitor} />
-          <ScoreCard label="Mobile" score={result.mobileScore} icon={Smartphone} />
-          <ScoreCard label="Content" score={result.contentScore} icon={Code} />
-          <ScoreCard label="Risk Score" score={result.security?.riskLevel === 'CRITICAL' ? 10 : result.security?.riskLevel === 'HIGH' ? 30 : 90} icon={Shield} />
-        </div>
-
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
           <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-orange-500" /> Critical Analysis Findings
+            <AlertTriangle size={16} className="text-orange-500" /> AI Analysis Findings
           </h4>
           <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
             {result.criticalIssues.map((issue, i) => (
@@ -182,30 +162,48 @@ export const Analysis: React.FC = () => {
     logAndSave(`Target Acquired: ${business.website}`);
 
     try {
-      // Step 1: Serverless Full Audit (Puppeteer + Scanning)
-      logAndSave("Initiating Puppeteer... Capturing viewport & extracting DOM...");
+      // Step 1: Initial Backend Scan for HTML & Security
+      logAndSave("Connecting to backend for security scan...");
       const auditData = await performFullAudit(business.website);
       
       if (auditData.status === 'error') {
-         // Don't throw here if we want to try generic fallbacks, but api.ts usually handles fallbacks.
-         // If we are here, it's a hard error.
-         logAndSave(`ERR: Audit failed. ${auditData.reason}`);
+         logAndSave(`ERR: Backend Audit failed. ${auditData.reason}`);
+         // If generic scan fails, we likely can't do much, but let's try proceeding if we have any fallback logic
+         // For now, abort if basic connectivity is dead
          throw new Error(auditData.reason || "Server scan failed");
       }
+      
+      logAndSave("Security scan complete. Extracting site map...");
+      
+      // Step 2: Extract Relevant Links from the HTML we just got
+      const internalLinks = extractRelevantLinks(auditData.rawHtml || '', business.website);
+      logAndSave(`Found ${internalLinks.length} relevant internal pages to audit.`);
 
-      if (auditData.status === 'fallback') {
-        logAndSave("WARN: Visual scan failed (Server Error). Switched to Text-Only analysis.");
-      } else {
-        logAndSave("Screenshot captured. DOM extracted. Active vulnerability scan complete.");
+      // Step 3: Run Lighthouse Audits on Main + Internal Pages (Sequential/Parallel)
+      const pagesToAudit = [business.website, ...internalLinks];
+      const lighthouseResults: LighthouseData[] = [];
+
+      for (const url of pagesToAudit) {
+        logAndSave(`Running Lighthouse Audit on: ${url}...`);
+        const result = await runLighthouseAudit(url);
+        if (result.lighthouse.screenshot) {
+          lighthouseResults.push(result.lighthouse);
+          logAndSave(`Captured screenshot & metrics for ${url}`);
+        } else {
+          logAndSave(`Failed to capture visual data for ${url}`);
+        }
+      }
+
+      if (lighthouseResults.length === 0) {
+        throw new Error("Lighthouse failed to capture any screenshots.");
       }
 
       if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
         logAndSave(`ALERT: Detected ${auditData.vulnerabilities.length} active vulnerabilities.`);
       }
 
-      // Step 2: Email Discovery
+      // Step 4: Email Discovery
       logAndSave("Scanning DOM for contact vectors...");
-      // We pass the rawHtml from the backend scan if available, else fetch via proxy
       const htmlToScan = auditData.rawHtml || "";
       const contactInfo = await findAndVerifyEmail(business, htmlToScan);
       
@@ -213,11 +211,18 @@ export const Analysis: React.FC = () => {
         logAndSave(`CONTACT: ${contactInfo.email} (Source: ${contactInfo.source})`);
       }
 
-      // Step 3: AI Synthesis (Gemini)
-      logAndSave("Synthesizing audit data with Gemini 2.5...");
-      // Combine active scan data with AI analysis
-      const analysis = await analyzeWebsiteWithGemini(business, auditData.screenshot, htmlToScan);
+      // Step 5: AI Synthesis (Gemini)
+      logAndSave("Synthesizing multi-page audit data with Gemini 2.5...");
       
+      // Use the Homepage screenshot as the primary one for the record, but pass all to Gemini
+      const primaryScreenshot = lighthouseResults[0].screenshot;
+
+      const analysis = await analyzeWebsiteWithGemini(business, lighthouseResults, htmlToScan);
+      
+      // Inject Main Page Lighthouse Data into Analysis for record keeping
+      analysis.lighthouse = lighthouseResults[0];
+      analysis.performanceScore = lighthouseResults[0].performance;
+
       // Merge Active Scan Vulnerabilities into Gemini's result
       if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
           analysis.security = {
@@ -254,7 +259,7 @@ export const Analysis: React.FC = () => {
       updateBusiness(business.id, {
         status: BusinessStatus.ANALYZED,
         analysis: analysis,
-        screenshot: auditData.screenshot,
+        screenshot: primaryScreenshot, // Save the lighthouse screenshot!
         logs: logHistory,
         email: contactInfo?.email || business.email,
         contactInfo: contactInfo || undefined

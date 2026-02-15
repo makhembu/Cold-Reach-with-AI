@@ -1,3 +1,4 @@
+
 {
   "name": "coldreach-ai",
   "version": "1.0.0",
@@ -6,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit:local": "node scripts/audit.js"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -19,7 +21,10 @@
     "tailwind-merge": "^2.2.1",
     "puppeteer-core": "^22.4.0",
     "@sparticuz/chromium": "^121.0.0",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "playwright": "^1.42.0",
+    "lighthouse": "^11.5.0",
+    "playwright-lighthouse": "^4.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",

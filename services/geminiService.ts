@@ -1,7 +1,8 @@
+
 import { GoogleGenAI } from '@google/genai';
 import { load } from 'cheerio';
 import { getSettings } from './storage';
-import { AnalysisResult, Business, BusinessStatus, UserProfile, ContactInfo } from '../types';
+import { AnalysisResult, Business, BusinessStatus, UserProfile, ContactInfo, LighthouseData } from '../types';
 import { fetchRawHtml } from './api';
 
 const getAI = () => {
@@ -133,7 +134,7 @@ export const findAndVerifyEmail = async (business: Business, htmlContent: string
 
 export const analyzeWebsiteWithGemini = async (
   business: Business,
-  screenshotBase64: string | undefined,
+  lighthouseResults: LighthouseData[],
   rawHtml: string
 ): Promise<AnalysisResult> => {
   const ai = getAI();
@@ -141,58 +142,62 @@ export const analyzeWebsiteWithGemini = async (
   // Extract meta tags via Cheerio for hints
   const $ = load(rawHtml);
   const generator = $('meta[name="generator"]').attr('content') || 'Unknown';
-  const serverHeader = 'Unknown'; // Can't fetch headers client-side easily without proxy passing them
   const hasHttps = business.website.startsWith('https');
 
+  // Format Lighthouse findings for context
+  const auditSummary = lighthouseResults.map((lr, index) => `
+    Page ${index + 1} (${lr.url}):
+    - Performance: ${lr.performance}
+    - Accessibility: ${lr.accessibility}
+    - SEO: ${lr.seo}
+    - Key Tech Issues: ${lr.failedAudits?.join(', ') || 'None critical'}
+  `).join('\n');
+
   const prompt = `
-    Act as a Black Hat Hacker turned Security Consultant.
+    Act as a Senior Web Consultant & Security Expert.
     
     Target: ${business.website}
-    Generator Meta Tag: ${generator}
-    Protocol: ${hasHttps ? 'HTTPS' : 'HTTP (Insecure)'}
+    Generator: ${generator}
+    Protocol: ${hasHttps ? 'HTTPS' : 'HTTP'}
     
-    Raw HTML Snippet (First 2000 chars):
-    ${rawHtml.substring(0, 2000)}...
+    Lighthouse Audit Data (Use this for technical critique):
+    ${auditSummary}
 
-    Task 1: Identify Specific Vulnerabilities
-    - Look for outdated software versions (WordPress, Plugins, jQuery).
-    - Look for exposed sensitive paths in HTML comments.
-    - Missing Headers (CSP, X-Frame) - Assume missing if not evident.
+    Raw HTML Snippet:
+    ${rawHtml.substring(0, 1000)}...
+
+    Task 1: Visual & Technical Analysis (Based on Screenshots & Audit Data)
+    - Analyze the provided screenshots (Home + internal pages if available).
+    - Critique the design modernity, mobile responsiveness, and user journey.
+    - Reference the specific Lighthouse failures (e.g. if Performance is low, mention why).
     
-    Task 2: Create Exploit Scenarios (URGENCY)
-    - For each vulnerability, explain EXACTLY how a bad actor exploits it. 
-    - Example: "Outdated jQuery -> XSS -> Steal Admin Cookies".
-    - Example: "No HTTPS -> Man-in-the-Middle -> Intercept customer passwords".
+    Task 2: Vulnerability Scan
+    - Identify risks based on the tech stack (outdated WP, etc).
+    - If HTTP, flag as Critical.
 
-    Task 3: Score & Strategy
-    - If risk is HIGH, focus strategy on SECURITY.
+    Task 3: Sales Strategy
+    - Based on the WORST finding (ugly design vs security risk), pick a strategy.
     
     Return JSON:
     {
-      "techStack": { "cms": ["string"], "frontend": ["string"], "detectedVersions": { "SoftwareName": "Version" } },
+      "techStack": { "cms": ["string"], "frontend": ["string"], "detectedVersions": { "Soft": "Ver" } },
       "interventionRequired": boolean,
       "interventionReason": "string",
       "overallScore": number,
       "designScore": number,
       "uxScore": number,
       "mobileScore": number,
+      "performanceScore": number,
+      "contentScore": number,
       "security": {
         "https": boolean,
         "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-        "vulnerabilities": [
-          {
-            "name": "string", 
-            "severity": "CRITICAL" | "HIGH" | "MEDIUM",
-            "description": "string",
-            "exploitScenario": "string (The scary part)",
-            "remediation": "string"
-          }
-        ]
+        "vulnerabilities": [{ "name": "string", "severity": "string", "description": "string", "exploitScenario": "string", "remediation": "string" }]
       },
       "criticalIssues": ["string"],
       "quickWins": ["string"],
       "strategy": {
-        "focus": "SECURITY" | "DESIGN",
+        "focus": "SECURITY" | "DESIGN" | "SEO",
         "rationale": "string",
         "suggestedPrice": "string",
         "vulnerabilityExplainer": "string",
@@ -204,13 +209,16 @@ export const analyzeWebsiteWithGemini = async (
   `;
 
   const parts: any[] = [{ text: prompt }];
-  if (screenshotBase64) {
-    // Strip header if present
-    const base64Data = screenshotBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
-    parts.push({
-      inlineData: { mimeType: 'image/jpeg', data: base64Data }
-    });
-  }
+  
+  // Attach all screenshots
+  lighthouseResults.forEach((lr) => {
+    if (lr.screenshot) {
+      const base64Data = lr.screenshot.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
+      parts.push({
+        inlineData: { mimeType: 'image/jpeg', data: base64Data }
+      });
+    }
+  });
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',

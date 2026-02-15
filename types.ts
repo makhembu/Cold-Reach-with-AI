@@ -74,6 +74,17 @@ export interface SecurityAudit {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
+export interface LighthouseData {
+  url: string;
+  performance: number;
+  accessibility: number;
+  bestPractices: number;
+  seo: number;
+  pwa?: number;
+  screenshot?: string;
+  failedAudits?: string[]; // List of key failed audit titles
+}
+
 export interface StrategicAnalysis {
   country: string;
   currency: string;
@@ -91,6 +102,9 @@ export interface AnalysisResult {
   mobileScore: number;
   contentScore: number;
   performanceScore: number;
+  
+  lighthouse?: LighthouseData; // Main page lighthouse data
+  secondaryLighthouse?: LighthouseData[]; // Other pages
   
   techStack?: TechStack;
   navigationLog?: NavigationStep[];
