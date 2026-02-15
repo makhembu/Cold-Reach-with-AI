@@ -4,8 +4,8 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 // Optimize chromium for serverless environment
-chromium.setHeadlessMode = true;
-chromium.setGraphicsMode = false;
+// chromium.headless returns the correct mode string for puppeteer
+// Graphics mode is disabled by default in this package
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,7 +18,6 @@ export default async function handler(req, res) {
   }
 
   let browser = null;
-  const auditLog = [];
 
   try {
     const formattedUrl = url.startsWith('http') ? url : `https://${url}`;

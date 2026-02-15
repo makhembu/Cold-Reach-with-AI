@@ -13,13 +13,13 @@
     "react-dom": "^18.3.1",
     "lucide-react": "^0.344.0",
     "recharts": "^2.12.2",
-    "@google/genai": "^0.1.0",
+    "@google/genai": "^0.2.1",
     "axios": "^1.6.7",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.1",
     "puppeteer-core": "^22.4.0",
     "@sparticuz/chromium": "^121.0.0",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
