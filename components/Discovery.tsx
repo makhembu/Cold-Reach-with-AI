@@ -128,7 +128,7 @@ export const Discovery: React.FC = () => {
                   <td className="px-6 py-4 font-medium text-slate-900">{b.name}</td>
                   <td className="px-6 py-4">
                     <a href={b.website} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-sm flex items-center gap-1">
-                       {b.website} <ArrowRight size={12} -rotate-45 />
+                       {b.website} <ArrowRight size={12} className="-rotate-45" />
                     </a>
                   </td>
                   <td className="px-6 py-4 text-slate-600">{b.location}</td>
