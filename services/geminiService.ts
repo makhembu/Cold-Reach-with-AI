@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 import { load } from 'cheerio';
 import { getSettings } from './storage';
@@ -229,6 +228,64 @@ export const analyzeWebsiteWithGemini = async (
   return JSON.parse(response.text || '{}');
 };
 
+export const analyzeBusinessFromSearch = async (business: Business): Promise<AnalysisResult> => {
+  const ai = getAI();
+  const prompt = `
+    I cannot access the website ${business.website} directly for a scan.
+    Please analyze this business using Google Search to infer its digital presence.
+    
+    1. Find out what they do and verify if the website is active or if they have other presence (socials, maps).
+    2. Look for reviews or mentions.
+    3. Infer potential issues based on their industry (${business.category}) and location (${business.location}).
+    
+    Return a provisional Analysis JSON with conservatively estimated scores (average 50-60 if unknown):
+    {
+      "overallScore": number,
+      "designScore": number,
+      "uxScore": number,
+      "mobileScore": number,
+      "performanceScore": number,
+      "contentScore": number,
+      "criticalIssues": ["string"],
+      "quickWins": ["string"],
+      "reasoning": "string",
+      "strategy": { 
+        "focus": "DESIGN" | "SEO" | "CONVERSION",
+        "rationale": "string",
+        "suggestedPrice": "string",
+        "country": "string",
+        "roadmap": ["string"]
+      }
+    }
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: { 
+      tools: [{ googleSearch: {} }],
+      responseMimeType: 'application/json' 
+    }
+  });
+
+  const partial = JSON.parse(response.text || '{}');
+  
+  // Fill in missing fields with defaults to satisfy type safety
+  return {
+    overallScore: 50,
+    designScore: 50,
+    uxScore: 50,
+    mobileScore: 50,
+    contentScore: 50,
+    performanceScore: 50,
+    needsRedesign: true,
+    criticalIssues: ["Site not directly accessible"],
+    quickWins: ["Ensure website uptime"],
+    reasoning: "Analysis inferred from external search signals due to access failure.",
+    ...partial
+  };
+};
+
 // --- Asset Generation ---
 
 export const generateMockupWithGemini = async (business: Business, analysis: AnalysisResult): Promise<string> => {
@@ -246,13 +303,13 @@ export const generateSecurityReportWithGemini = async (business: Business, analy
   const ai = getAI();
   const vulns = analysis.security?.vulnerabilities.map(v => 
     `- **${v.name}** (${v.severity}): ${v.description}\n  *Hacker View:* ${v.exploitScenario}`
-  ).join('\n');
+  ).join('\n') || "No specific vulnerabilities listed.";
 
   const prompt = `
     Generate a Penetration Test Report (Markdown) for ${business.website}.
     
     Executive Summary:
-    This site is at ${analysis.security?.riskLevel} risk.
+    This site is at ${analysis.security?.riskLevel || 'UNKNOWN'} risk.
     
     Detailed Findings:
     ${vulns}
@@ -279,9 +336,9 @@ export const generatePitchWithGemini = async (business: Business, analysis: Anal
   const context = isSecurity 
     ? `
       FOCUS: CRITICAL SECURITY RISK.
-      Vulnerability: ${scaryVuln?.name}
-      Exploit Scenario (Use this to scare them respectfully): ${scaryVuln?.exploitScenario}
-      Solution: We patch this for ${analysis.strategy?.suggestedPrice}.
+      Vulnerability: ${scaryVuln?.name || 'Potential Exposure'}
+      Exploit Scenario (Use this to scare them respectfully): ${scaryVuln?.exploitScenario || 'Data leakage risk'}
+      Solution: We patch this for ${analysis.strategy?.suggestedPrice || '$500'}.
     ` 
     : `FOCUS: DESIGN/CONVERSION. Issue: ${analysis.criticalIssues[0]}`;
 

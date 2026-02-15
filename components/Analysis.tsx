@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, AlertTriangle, Shield, Smartphone, Monitor, Loader2, Lock, Search, Code, Terminal, Server, Layers, Globe, Eye, History, Bug, Skull, Zap, Gauge } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
 import { performFullAudit } from '../services/api';
 import { runLighthouseAudit, extractRelevantLinks } from '../services/simulation';
-import { analyzeWebsiteWithGemini, findAndVerifyEmail } from '../services/geminiService';
+import { analyzeWebsiteWithGemini, findAndVerifyEmail, analyzeBusinessFromSearch } from '../services/geminiService';
 import { Business, BusinessStatus, AnalysisResult, LighthouseData } from '../types';
 
 const TechBadge: React.FC<{ label: string }> = ({ label }) => (
@@ -166,45 +165,61 @@ export const Analysis: React.FC = () => {
       logAndSave("Connecting to backend for security scan...");
       const auditData = await performFullAudit(business.website);
       
-      if (auditData.status === 'error') {
-         logAndSave(`ERR: Backend Audit failed. ${auditData.reason}`);
-         // If generic scan fails, we likely can't do much, but let's try proceeding if we have any fallback logic
-         // For now, abort if basic connectivity is dead
-         throw new Error(auditData.reason || "Server scan failed");
+      let htmlToScan = auditData.rawHtml || "";
+
+      // HANDLE FAILURE: If backend audit fails, try fallback analysis
+      if (auditData.status === 'error' || (!htmlToScan && auditData.status !== 'success')) {
+         logAndSave(`WARN: Direct scan failed (${auditData.reason || "unknown"}). Switching to Search Fallback...`);
+         
+         try {
+           const fallbackAnalysis = await analyzeBusinessFromSearch(business);
+           logAndSave("Success: Analysis inferred via Google Search.");
+           
+           updateBusiness(business.id, {
+             status: BusinessStatus.ANALYZED,
+             analysis: fallbackAnalysis,
+             logs: logHistory,
+           });
+           setAnalyzingId(null);
+           return;
+         } catch (fallbackError: any) {
+           throw new Error("Analysis failed completely: " + fallbackError.message);
+         }
       }
       
       logAndSave("Security scan complete. Extracting site map...");
       
-      // Step 2: Extract Relevant Links from the HTML we just got
-      const internalLinks = extractRelevantLinks(auditData.rawHtml || '', business.website);
+      // Step 2: Extract Relevant Links
+      const internalLinks = extractRelevantLinks(htmlToScan, business.website);
       logAndSave(`Found ${internalLinks.length} relevant internal pages to audit.`);
 
-      // Step 3: Run Lighthouse Audits on Main + Internal Pages (Sequential/Parallel)
+      // Step 3: Run Lighthouse Audits (External Google Service)
+      // We run this even if 'auditData' was partial, provided we have a URL
       const pagesToAudit = [business.website, ...internalLinks];
       const lighthouseResults: LighthouseData[] = [];
 
       for (const url of pagesToAudit) {
         logAndSave(`Running Lighthouse Audit on: ${url}...`);
-        const result = await runLighthouseAudit(url);
-        if (result.lighthouse.screenshot) {
-          lighthouseResults.push(result.lighthouse);
-          logAndSave(`Captured screenshot & metrics for ${url}`);
-        } else {
-          logAndSave(`Failed to capture visual data for ${url}`);
+        try {
+          const result = await runLighthouseAudit(url);
+          if (result.lighthouse.screenshot) {
+            lighthouseResults.push(result.lighthouse);
+            logAndSave(`Captured screenshot & metrics for ${url}`);
+          } else {
+            logAndSave(`Failed to capture visual data for ${url}`);
+          }
+        } catch (e) {
+          logAndSave(`Skip: Lighthouse failed for ${url}`);
         }
       }
 
-      if (lighthouseResults.length === 0) {
-        throw new Error("Lighthouse failed to capture any screenshots.");
-      }
-
-      if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
-        logAndSave(`ALERT: Detected ${auditData.vulnerabilities.length} active vulnerabilities.`);
+      if (lighthouseResults.length === 0 && !htmlToScan) {
+        // Double check failure condition
+         throw new Error("No data could be gathered (Visual or Textual).");
       }
 
       // Step 4: Email Discovery
       logAndSave("Scanning DOM for contact vectors...");
-      const htmlToScan = auditData.rawHtml || "";
       const contactInfo = await findAndVerifyEmail(business, htmlToScan);
       
       if (contactInfo) {
@@ -214,16 +229,17 @@ export const Analysis: React.FC = () => {
       // Step 5: AI Synthesis (Gemini)
       logAndSave("Synthesizing multi-page audit data with Gemini 2.5...");
       
-      // Use the Homepage screenshot as the primary one for the record, but pass all to Gemini
-      const primaryScreenshot = lighthouseResults[0].screenshot;
+      const primaryScreenshot = lighthouseResults[0]?.screenshot;
 
       const analysis = await analyzeWebsiteWithGemini(business, lighthouseResults, htmlToScan);
       
       // Inject Main Page Lighthouse Data into Analysis for record keeping
-      analysis.lighthouse = lighthouseResults[0];
-      analysis.performanceScore = lighthouseResults[0].performance;
+      if (lighthouseResults[0]) {
+        analysis.lighthouse = lighthouseResults[0];
+        analysis.performanceScore = lighthouseResults[0].performance;
+      }
 
-      // Merge Active Scan Vulnerabilities into Gemini's result
+      // Merge Active Scan Vulnerabilities into Gemini's result (if any found in backend audit)
       if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
           analysis.security = {
               ...analysis.security,
@@ -259,7 +275,7 @@ export const Analysis: React.FC = () => {
       updateBusiness(business.id, {
         status: BusinessStatus.ANALYZED,
         analysis: analysis,
-        screenshot: primaryScreenshot, // Save the lighthouse screenshot!
+        screenshot: primaryScreenshot, 
         logs: logHistory,
         email: contactInfo?.email || business.email,
         contactInfo: contactInfo || undefined

@@ -5,15 +5,26 @@ import axios from 'axios';
 // --- HTML Fetching (CORS Proxy) ---
 
 export const fetchRawHtml = async (url: string): Promise<string> => {
-  try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.text();
-  } catch (error) {
-    console.error("Failed to fetch raw HTML:", error);
-    return "";
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+  ];
+
+  for (const proxy of proxies) {
+    try {
+      const response = await fetch(proxy);
+      if (response.ok) {
+        const text = await response.text();
+        if (text.length > 100) return text;
+      }
+    } catch (error) {
+      continue;
+    }
   }
+  
+  console.warn("All proxies failed to fetch HTML for", url);
+  return "";
 };
 
 // --- Deep Analysis & Security Scan (Serverless) ---

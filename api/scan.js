@@ -29,7 +29,9 @@ export default async function handler(req, res) {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--single-process',
+        '--no-zygote'
       ],
       defaultViewport: chromium.defaultViewport,
       executablePath: executablePath || process.env.PUPPETEER_EXECUTABLE_PATH,
