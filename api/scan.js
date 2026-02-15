@@ -4,9 +4,6 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 // Optimize chromium for serverless environment
-// chromium.headless returns the correct mode string for puppeteer
-// Graphics mode is disabled by default in this package
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -22,12 +19,22 @@ export default async function handler(req, res) {
   try {
     const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
     
-    // 1. Launch Browser
+    // Configure for serverless environment (AWS Lambda / Vercel)
+    // Sometimes local executables are needed if running locally
+    const executablePath = await chromium.executablePath();
+
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ],
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
+      executablePath: executablePath || process.env.PUPPETEER_EXECUTABLE_PATH,
       headless: chromium.headless,
+      ignoreHTTPSErrors: true
     });
 
     const page = await browser.newPage();
@@ -35,7 +42,7 @@ export default async function handler(req, res) {
     
     // 2. Navigation & Screenshot
     const startTime = Date.now();
-    const response = await page.goto(formattedUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+    const response = await page.goto(formattedUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
     const loadTime = Date.now() - startTime;
     
     const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 60, fullPage: false });
@@ -129,7 +136,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     if (browser) await browser.close();
-    console.error(error);
+    console.error("Puppeteer Error:", error);
     res.status(500).json({ 
       success: false, 
       error: error.message,

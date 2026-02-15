@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, AlertTriangle, Shield, Smartphone, Monitor, Loader2, Lock, Search, Code, Terminal, Server, Layers, Globe, Eye, History, Bug, Skull } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
@@ -62,6 +61,9 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
               {soft}: {ver as string}
             </span>
          ))}
+         {(!result.techStack?.frontend?.length && !result.techStack?.cms?.length) && (
+           <span className="text-slate-500 text-xs italic">No explicit technologies detected via headers/DOM.</span>
+         )}
       </div>
     </div>
 
@@ -75,8 +77,11 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
               </div>
            </div>
          ) : (
-           <div className="h-48 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs">
-             Screenshot blocked / unavailable
+           <div className="h-48 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs border border-slate-300">
+             <div className="text-center p-4">
+               <Eye size={24} className="mx-auto mb-2 opacity-50" />
+               Visual Scan Failed<br/>(Text Analysis Only)
+             </div>
            </div>
          )}
          
@@ -182,10 +187,17 @@ export const Analysis: React.FC = () => {
       const auditData = await performFullAudit(business.website);
       
       if (auditData.status === 'error') {
+         // Don't throw here if we want to try generic fallbacks, but api.ts usually handles fallbacks.
+         // If we are here, it's a hard error.
          logAndSave(`ERR: Audit failed. ${auditData.reason}`);
          throw new Error(auditData.reason || "Server scan failed");
       }
-      logAndSave("Screenshot captured. DOM extracted. Active vulnerability scan complete.");
+
+      if (auditData.status === 'fallback') {
+        logAndSave("WARN: Visual scan failed (Server Error). Switched to Text-Only analysis.");
+      } else {
+        logAndSave("Screenshot captured. DOM extracted. Active vulnerability scan complete.");
+      }
 
       if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
         logAndSave(`ALERT: Detected ${auditData.vulnerabilities.length} active vulnerabilities.`);
@@ -202,7 +214,7 @@ export const Analysis: React.FC = () => {
       }
 
       // Step 3: AI Synthesis (Gemini)
-      logAndSave("Synthesizing audit data with Gemini 2.0...");
+      logAndSave("Synthesizing audit data with Gemini 2.5...");
       // Combine active scan data with AI analysis
       const analysis = await analyzeWebsiteWithGemini(business, auditData.screenshot, htmlToScan);
       

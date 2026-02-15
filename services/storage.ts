@@ -24,6 +24,37 @@ const DEFAULT_PROFILE: UserProfile = {
   onboardingCompleted: false
 };
 
+// Safe storage wrapper to handle quota limits
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e: any) {
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      console.warn("LocalStorage Quota Exceeded. Attempting to cleanup...");
+      // Try to clean up businesses that are just discovered but old? 
+      // Or just warn user. For now, we'll try to strip heavy logs/screenshots from the payload being saved.
+      
+      if (key === KEYS.BUSINESSES) {
+        try {
+          // Parse the businesses, strip screenshots/logs from older ones
+          const businesses: Business[] = JSON.parse(value);
+          const slimBusinesses = businesses.map(b => ({
+            ...b,
+            screenshot: undefined, // Drop screenshots to save space
+            logs: undefined        // Drop logs
+          }));
+          localStorage.setItem(key, JSON.stringify(slimBusinesses));
+          alert("Storage full! Screenshots were removed to save your data.");
+          return;
+        } catch (err) {
+          console.error("Failed to recover from storage quota", err);
+        }
+      }
+      alert("Critical: Storage Full. Some data could not be saved.");
+    }
+  }
+};
+
 export const initStorage = () => {
   if (!localStorage.getItem(KEYS.BUSINESSES)) {
     localStorage.setItem(KEYS.BUSINESSES, JSON.stringify([]));
@@ -42,7 +73,7 @@ export const getBusinesses = (): Business[] => {
 };
 
 export const saveBusinesses = (businesses: Business[]) => {
-  localStorage.setItem(KEYS.BUSINESSES, JSON.stringify(businesses));
+  safeSetItem(KEYS.BUSINESSES, JSON.stringify(businesses));
 };
 
 export const addBusiness = (business: Business) => {
@@ -72,7 +103,7 @@ export const getSettings = (): Settings => {
 };
 
 export const saveSettings = (settings: Settings) => {
-  localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+  safeSetItem(KEYS.SETTINGS, JSON.stringify(settings));
 };
 
 export const getUserProfile = (): UserProfile => {
@@ -81,7 +112,7 @@ export const getUserProfile = (): UserProfile => {
 };
 
 export const saveUserProfile = (profile: UserProfile) => {
-  localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+  safeSetItem(KEYS.PROFILE, JSON.stringify(profile));
 };
 
 export const clearData = () => {

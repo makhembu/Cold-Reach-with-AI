@@ -20,7 +20,7 @@ export const fetchRawHtml = async (url: string): Promise<string> => {
 
 export const performFullAudit = async (url: string): Promise<{
   screenshot: string | undefined;
-  status: 'success' | 'blocked' | 'error';
+  status: 'success' | 'blocked' | 'error' | 'fallback';
   techStack?: any;
   vulnerabilities?: any[];
   securityHeaders?: any;
@@ -32,15 +32,11 @@ export const performFullAudit = async (url: string): Promise<{
     // Determine API URL based on environment
     const apiUrl = '/api/scan'; 
 
-    const response = await axios.post(apiUrl, { url });
+    const response = await axios.post(apiUrl, { url }, { timeout: 45000 }); // Longer timeout for puppeteer
     const data = response.data;
 
     if (!data.success) {
-      return { 
-        screenshot: undefined, 
-        status: 'error', 
-        reason: data.error 
-      };
+      throw new Error(data.error || "Backend reported failure");
     }
 
     return {
@@ -53,8 +49,27 @@ export const performFullAudit = async (url: string): Promise<{
       rawHtml: data.rawHtml
     };
   } catch (error: any) {
-    console.error("Audit failed:", error);
-    // Fallback to simpler check if serverless function fails or is not available (dev mode without Vercel CLI)
+    console.warn("Deep scan failed, attempting client-side fallback...", error.message);
+    
+    // Fallback: Fetch raw HTML directly via proxy
+    try {
+      const rawHtml = await fetchRawHtml(url);
+      if (rawHtml && rawHtml.length > 100) {
+        return {
+          status: 'fallback',
+          screenshot: undefined,
+          techStack: { frontend: [], cms: [], detectedVersions: {} }, // Empty stack
+          vulnerabilities: [],
+          securityHeaders: {},
+          loadTime: 0,
+          rawHtml: rawHtml
+        };
+      }
+    } catch (fallbackError) {
+      console.error("Fallback also failed", fallbackError);
+    }
+
+    // If both fail
     return { 
       screenshot: undefined, 
       status: 'error', 
