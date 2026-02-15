@@ -132,7 +132,7 @@ export default function App() {
 
           <div className="p-4 border-t border-slate-800">
              <div className="text-xs text-slate-500 text-center">
-                v1.1.0 • Powered by Gemini 2.0
+                v1.1.0 • Powered by Gemini 2.5
              </div>
           </div>
         </div>

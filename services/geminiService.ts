@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 import { load } from 'cheerio';
 import { getSettings } from './storage';
@@ -19,7 +18,7 @@ export const generateProfileFromInput = async (input: string): Promise<Partial<U
   const ai = getAI();
   const prompt = `Analyze: "${input}". Create JSON: { "businessName": string, "bio": string }`;
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'application/json' }
   });
@@ -30,7 +29,7 @@ export const getDiscoverySuggestions = async (profile: UserProfile): Promise<str
   const ai = getAI();
   const prompt = `Based on: ${profile.businessName} (${profile.bio}), suggest 5 Google Maps queries for finding clients with bad sites. JSON: { "queries": string[] }`;
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'application/json' }
   });
@@ -42,7 +41,7 @@ export const searchBusinessesWithGemini = async (query: string): Promise<Busines
   const ai = getAI();
   const prompt = `Find 10 businesses for "${query}". Return valid JSON array: [{ "name": string, "website": string, "location": string, "category": string }]`;
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { tools: [{ googleSearch: {} }] }
   });
@@ -108,7 +107,7 @@ export const findAndVerifyEmail = async (business: Business, htmlContent: string
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { 
       tools: [{ googleSearch: {} }],
@@ -214,7 +213,7 @@ export const analyzeWebsiteWithGemini = async (
   }
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: { parts },
     config: { responseMimeType: 'application/json' }
   });
@@ -228,7 +227,7 @@ export const generateMockupWithGemini = async (business: Business, analysis: Ana
   const ai = getAI();
   const prompt = `Create a single-file HTML landing page (Tailwind CSS) for ${business.name}. Fix these issues: ${analysis.criticalIssues.join(', ')}. Return ONLY HTML code.`;
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'text/plain' }
   });
@@ -255,7 +254,7 @@ export const generateSecurityReportWithGemini = async (business: Business, analy
   `;
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'text/plain' }
   });
@@ -294,7 +293,7 @@ export const generatePitchWithGemini = async (business: Business, analysis: Anal
   `;
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'application/json' }
   });
@@ -306,13 +305,13 @@ export const generatePitchWithGemini = async (business: Business, analysis: Anal
 export const judgePitchWithGemini = async (business: Business, pitch: any, strategy: any): Promise<any> => {
   const ai = getAI();
   const prompt = `Rate this cold email 1-10. Does it mention the specific issue defined in strategy (${strategy?.focus})? JSON: { "score": number, "critique": string }`;
-  const response = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt, config: { responseMimeType: 'application/json' } });
+  const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json' } });
   return JSON.parse(response.text || '{}');
 };
 
 export const generateRefinedPitchWithGemini = async (business: Business, oldPitch: any, critique: string): Promise<any> => {
   const ai = getAI();
   const prompt = `Refine email based on critique: "${critique}". JSON: { "subject": string, "body": string }`;
-  const response = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt, config: { responseMimeType: 'application/json' } });
+  const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json' } });
   return JSON.parse(response.text || '{}');
 };
