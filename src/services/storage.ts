@@ -11,8 +11,10 @@ const DEFAULT_SETTINGS: Settings = {
   geminiApiKey: '',
   outscraperApiKey: '',
   deepseekApiKey: '',
+  openRouterApiKey: '',
   screenshotApiToken: '',
   apiflashKey: '',
+  screenshotOneAccessKey: '',
   dailyEmailLimit: 50,
   emailConfig: {
     provider: 'gmail',
@@ -45,10 +47,11 @@ const safeSetItem = (key: string, value: string) => {
           const slimBusinesses = businesses.map(b => ({
             ...b,
             screenshot: undefined, // Drop screenshots to save space
-            logs: undefined        // Drop logs
+            logs: undefined,       // Drop logs
+            chatHistory: undefined // Drop chat history
           }));
           localStorage.setItem(key, JSON.stringify(slimBusinesses));
-          alert("Storage full! Screenshots were removed to save your data.");
+          alert("Storage full! Screenshots and logs were removed to save your data.");
           return;
         } catch (err) {
           console.error("Failed to recover from storage quota", err);

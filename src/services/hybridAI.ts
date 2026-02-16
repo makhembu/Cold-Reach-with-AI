@@ -1,10 +1,6 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-// ==========================================
-// API KEY MANAGEMENT
-// ==========================================
-
 function getAPIKeys() {
   const settings = localStorage.getItem('coldreach_settings');
   if (!settings) throw new Error('Configure API keys in Settings');
@@ -15,29 +11,33 @@ function getAPIKeys() {
     geminiKey: parsed.geminiApiKey,
     gcpProjectId: parsed.gcpProjectId || '',
     gcpLocation: parsed.gcpLocation || 'us-central1',
-    gcpAccessToken: parsed.gcpAccessToken || ''
+    gcpAccessToken: parsed.gcpAccessToken || '',
+    openRouterKey: parsed.openRouterApiKey || ''
   };
 }
-
-// ==========================================
-// USAGE TRACKING
-// ==========================================
 
 interface Usage {
   date: string;
   gemini: number;
   deepseek: number;
+  openrouter: number;
 }
 
 function getUsageToday(): Usage {
   const today = new Date().toDateString();
   const stored = localStorage.getItem('apiUsage');
-  if (!stored) return { date: today, gemini: 0, deepseek: 0 };
+  
+  const defaultUsage = { date: today, gemini: 0, deepseek: 0, openrouter: 0 };
+  
+  if (!stored) return defaultUsage;
+  
   const usage: Usage = JSON.parse(stored);
-  return usage.date === today ? usage : { date: today, gemini: 0, deepseek: 0 };
+  if (usage.date !== today) return defaultUsage;
+  
+  return { ...defaultUsage, ...usage };
 }
 
-function incrementUsage(model: 'gemini' | 'deepseek'): void {
+function incrementUsage(model: 'gemini' | 'deepseek' | 'openrouter'): void {
   const usage = getUsageToday();
   usage[model]++;
   localStorage.setItem('apiUsage', JSON.stringify(usage));
@@ -47,13 +47,10 @@ export function getAPIUsageStatus() {
   const usage = getUsageToday();
   return {
     gemini: { used: usage.gemini, limit: 1500, remaining: 1500 - usage.gemini },
-    deepseek: { used: usage.deepseek, limit: 999999, remaining: 999999 }
+    deepseek: { used: usage.deepseek, limit: 999999, remaining: 999999 },
+    openrouter: { used: usage.openrouter, limit: 50, remaining: 50 - usage.openrouter }
   };
 }
-
-// ==========================================
-// GEMINI CLIENTS (Vision + General)
-// ==========================================
 
 export async function callGeminiVision(prompt: string, screenshots: string[]): Promise<string> {
   const { geminiKey } = getAPIKeys();
@@ -108,7 +105,7 @@ export async function callGeminiPro(prompt: string): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   
   const response = await ai.models.generateContent({ 
-    model: 'gemini-2.5-flash', // Using 2.5 flash as a robust default
+    model: 'gemini-2.5-flash', 
     contents: prompt,
     config: {
       temperature: 0.4,
@@ -120,13 +117,10 @@ export async function callGeminiPro(prompt: string): Promise<string> {
   return response.text || "";
 }
 
-// ==========================================
-// DEEPSEEK VIA VERTEX AI
-// ==========================================
-
 export async function callDeepSeekReasoner(prompt: string): Promise<string> {
-  const { gcpProjectId, gcpLocation, gcpAccessToken } = getAPIKeys();
+  const { gcpProjectId, gcpLocation, gcpAccessToken, openRouterKey } = getAPIKeys();
   
+  // 1. Try GCP Vertex AI (Preferred)
   if (gcpProjectId && gcpAccessToken) {
     const endpoint = `https://${gcpLocation}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpLocation}/publishers/deepseek/models/deepseek-r1:generateContent`;
     
@@ -149,26 +143,53 @@ export async function callDeepSeekReasoner(prompt: string): Promise<string> {
         })
       });
       
-      if (!response.ok) {
-        console.warn(`DeepSeek Vertex AI failed: ${response.status}. Fallback to Gemini.`);
-        // Fallback below
-      } else {
+      if (response.ok) {
         const data = await response.json();
         incrementUsage('deepseek');
         return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } else {
+        console.warn(`DeepSeek Vertex AI failed: ${response.status}. Trying alternatives.`);
       }
     } catch (e) {
-      console.warn("DeepSeek error", e);
+      console.warn("DeepSeek GCP error", e);
     }
   }
+
+  // 2. Try OpenRouter (Secondary)
+  if (openRouterKey) {
+     const usage = getUsageToday();
+     if (usage.openrouter < 50) {
+        try {
+           const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${openRouterKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                "model": "deepseek/deepseek-r1",
+                "messages": [{ "role": "user", "content": prompt }]
+              })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                incrementUsage('openrouter');
+                return data.choices?.[0]?.message?.content || "";
+            } else {
+                console.warn("OpenRouter failed:", response.status);
+            }
+        } catch (e) {
+            console.warn("OpenRouter error", e);
+        }
+     } else {
+         console.warn("OpenRouter daily limit reached (50).");
+     }
+  }
   
-  // Fallback to Gemini
+  // 3. Fallback to Gemini
   return callGeminiFast(prompt);
 }
-
-// ==========================================
-// HYBRID AI ORCHESTRATOR
-// ==========================================
 
 export async function callHybridAI(config: {
   prompt: string;
@@ -179,32 +200,28 @@ export async function callHybridAI(config: {
   const { prompt, screenshots, taskType } = config;
   
   try {
-    // Decision logic: Which model to use?
     if (screenshots && screenshots.length > 0) {
-      // Always use Gemini for vision tasks
       const response = await callGeminiVision(prompt, screenshots);
       return { response, modelUsed: 'gemini-2.5-flash (vision)' };
     }
     
     if (taskType === 'planning' || taskType === 'strategy') {
-      // Use DeepSeek R1 for deep reasoning
       const response = await callDeepSeekReasoner(prompt);
+      // Check which service was actually used based on usage increment could be complex here without refactoring
+      // but conceptually it's "Reasoning Model"
       return { response, modelUsed: 'deepseek-r1 (reasoning)' };
     }
     
     if (taskType === 'quick' || taskType === 'chat') {
-      // Use Gemini Flash for speed
       const response = await callGeminiFast(prompt);
       return { response, modelUsed: 'gemini-2.5-flash (fast)' };
     }
     
     if (taskType === 'analysis') {
-      // Use Gemini Pro for balanced performance
       const response = await callGeminiPro(prompt);
       return { response, modelUsed: 'gemini-2.5-pro (analysis)' };
     }
     
-    // Default: Gemini Flash
     const response = await callGeminiFast(prompt);
     return { response, modelUsed: 'gemini-2.5-flash (default)' };
     
@@ -212,10 +229,9 @@ export async function callHybridAI(config: {
     console.error(`Primary model failed: ${error.message}. Trying fallback...`);
     
     if (screenshots && screenshots.length > 0) {
-      throw error; // Vision can't easily fallback if API key is invalid
+      throw error;
     }
     
-    // Try Gemini Fast as fallback
     try {
       const response = await callGeminiFast(prompt);
       return { response, modelUsed: 'gemini-2.5-flash (fallback)' };

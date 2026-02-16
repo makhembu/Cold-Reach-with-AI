@@ -5,7 +5,7 @@ import { getBusinesses, updateBusiness } from '../services/storage';
 import { analyzeAsAutonomousAgent } from '../services/autonomousAgent';
 import { chatWithAgent } from '../services/agentChat';
 import { getAPIUsageStatus } from '../services/hybridAI';
-import { Business, BusinessStatus } from '../types';
+import { Business, BusinessStatus, ChatMessage } from '../types';
 
 const AgentStatus = ({ status }: { status: string }) => {
   const configs: Record<string, any> = {
@@ -62,10 +62,15 @@ const TerminalLogs = ({ logs, modelUsed }: { logs: string[], modelUsed?: string 
 };
 
 const AgentChat = ({ business, onUpdate }: { business: Business, onUpdate: () => void }) => {
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'agent', content: string, model?: string }>>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(business.chatHistory || []);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => { 
+    setMessages(business.chatHistory || []);
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; 
+  }, [business.id, business.chatHistory]);
   
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [messages]);
   
@@ -73,18 +78,34 @@ const AgentChat = ({ business, onUpdate }: { business: Business, onUpdate: () =>
     if (!input.trim() || isThinking) return;
     const msg = input.trim();
     setInput('');
-    setMessages(p => [...p, { role: 'user', content: msg }]);
+    
+    const newUserMsg: ChatMessage = { role: 'user', content: msg, timestamp: Date.now() };
+    const newHistory = [...messages, newUserMsg];
+    setMessages(newHistory);
+    updateBusiness(business.id, { chatHistory: newHistory });
     setIsThinking(true);
     
     try {
-      const res = await chatWithAgent(business, msg, messages);
-      setMessages(p => [...p, { role: 'agent', content: res.message, model: res.modelUsed }]);
+      const res = await chatWithAgent(business, msg, newHistory);
+      const newAgentMsg: ChatMessage = { 
+        role: 'agent', 
+        content: res.message, 
+        model: res.modelUsed, 
+        timestamp: Date.now() 
+      };
+      
+      const finalHistory = [...newHistory, newAgentMsg];
+      setMessages(finalHistory);
+      updateBusiness(business.id, { chatHistory: finalHistory });
+      
       if (res.updatedAnalysis) {
-        // Handle updates if needed
         onUpdate();
       }
     } catch (e: any) {
-      setMessages(p => [...p, { role: 'agent', content: `Error: ${e.message}` }]);
+      const errorMsg: ChatMessage = { role: 'agent', content: `Error: ${e.message}`, timestamp: Date.now() };
+      const errorHistory = [...newHistory, errorMsg];
+      setMessages(errorHistory);
+      updateBusiness(business.id, { chatHistory: errorHistory });
     } finally {
       setIsThinking(false);
     }
@@ -195,7 +216,11 @@ export const Analysis: React.FC = () => {
   const [status, setStatus] = useState<string>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
-  const [usage, setUsage] = useState({ gemini: { used: 0, limit: 1500, remaining: 1500 }, deepseek: { used: 0, limit: 999999, remaining: 999999 } });
+  const [usage, setUsage] = useState({ 
+    gemini: { used: 0, limit: 1500, remaining: 1500 }, 
+    deepseek: { used: 0, limit: 999999, remaining: 999999 },
+    openrouter: { used: 0, limit: 50, remaining: 50 }
+  });
   
   useEffect(() => { 
     setBusinesses(getBusinesses()); 
@@ -278,7 +303,10 @@ export const Analysis: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="text-right text-[10px]">
               <div className="text-blue-400 font-bold">Gemini: {usage.gemini.used} used</div>
-              <div className="text-purple-400 font-bold">DeepSeek: {usage.deepseek.used} used</div>
+              <div className="text-purple-400 font-bold">DeepSeek (GCP): {usage.deepseek.used} used</div>
+              {usage.openrouter.used > 0 && (
+                <div className="text-orange-400 font-bold">DeepSeek (OpenRouter): {usage.openrouter.used}/50</div>
+              )}
             </div>
             <AgentStatus status={status} />
           </div>

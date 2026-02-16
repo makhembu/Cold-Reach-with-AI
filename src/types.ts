@@ -246,6 +246,13 @@ export interface ContactInfo {
   confidenceScore: number;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'agent';
+  content: string;
+  model?: string;
+  timestamp: number;
+}
+
 export interface Business {
   id: string;
   name: string;
@@ -262,6 +269,7 @@ export interface Business {
   logs?: string[]; 
   analysis?: AnalysisResult;
   assets?: GeneratedAssets;
+  chatHistory?: ChatMessage[];
   
   // New Agent Fields
   agentResult?: FullAnalysisResult;
@@ -284,8 +292,11 @@ export interface Settings {
   gcpLocation?: string;
   gcpAccessToken?: string;
   
+  openRouterApiKey?: string; // Add OpenRouter key support
+
   screenshotApiToken?: string;
   apiflashKey?: string;
+  screenshotOneAccessKey?: string;
   
   emailConfig: EmailConfig;
   dailyEmailLimit: number;
