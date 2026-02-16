@@ -1,7 +1,10 @@
-
 import { Business, ProfessionalAnalysis, OutreachStrategy, CollectedData } from '../types';
 import { callHybridAI } from './hybridAI';
 import { cleanJSONResponse } from './autonomousAgent';
+
+// ==========================================
+// PHASE 3: DEEP PROFESSIONAL ANALYSIS
+// ==========================================
 
 export async function performDeepProfessionalAnalysis(
   business: Business,
@@ -120,6 +123,10 @@ Return ONLY valid JSON (no markdown):
     throw new Error(`Invalid analysis: ${response.substring(0, 200)}`);
   }
 }
+
+// ==========================================
+// PHASE 4: STRATEGIC DECISION
+// ==========================================
 
 export async function determineOutreachStrategy(
   business: Business,

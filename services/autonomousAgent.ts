@@ -1,7 +1,10 @@
-
 import { Business, ReconnaissancePlan, CollectedData, ProfessionalAnalysis, OutreachStrategy, FullAnalysisResult } from '../types';
 
-async function withTimeout<T>(
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+
+export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   operationName: string
@@ -15,7 +18,7 @@ async function withTimeout<T>(
   return Promise.race([promise, timeoutPromise]);
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -24,6 +27,10 @@ export function cleanJSONResponse(response: string): string {
   cleaned = cleaned.trim();
   return cleaned;
 }
+
+// ==========================================
+// MAIN AUTONOMOUS AGENT FUNCTION
+// ==========================================
 
 export async function analyzeAsAutonomousAgent(
   business: Business,
@@ -35,9 +42,12 @@ export async function analyzeAsAutonomousAgent(
   onLog("🧠 Autonomous AI Agent initializing...");
   agentThoughts.push("Agent activated for: " + business.name);
   
+  // Import functions from other modules
+  // Dynamic imports help avoid circular dependencies during initialization if any
   const { createReconnaissancePlan, executeReconnaissancePlan } = await import('./agentPhases');
   const { performDeepProfessionalAnalysis, determineOutreachStrategy } = await import('./agentAnalysis');
   
+  // PHASE 1: AI RECONNAISSANCE PLANNING
   onLog("📋 Phase 1: Creating reconnaissance strategy...");
   
   const reconPlan = await withTimeout(
@@ -49,6 +59,7 @@ export async function analyzeAsAutonomousAgent(
   onLog(`Strategy: ${reconPlan.strategy}`);
   onLog(`Tools: ${reconPlan.tools_needed.map((t: any) => t.tool).join(', ')}`);
   
+  // PHASE 2: EXECUTE AI'S PLAN
   onLog("🔍 Phase 2: Executing reconnaissance...");
   
   const collectedData = await executeReconnaissancePlan(
@@ -61,6 +72,7 @@ export async function analyzeAsAutonomousAgent(
   const dataKeys = Object.keys(collectedData).filter(k => !collectedData[k].error);
   onLog(`✓ Collected ${dataKeys.length} data sources`);
   
+  // PHASE 3: DEEP PROFESSIONAL ANALYSIS
   onLog("🔬 Phase 3: Deep analysis...");
   
   const analysis = await withTimeout(
@@ -72,6 +84,7 @@ export async function analyzeAsAutonomousAgent(
   onLog(`Score: ${analysis.overall_score}/100`);
   onLog(`Verdict: ${analysis.verdict}`);
   
+  // PHASE 4: STRATEGIC DECISION
   onLog("🎯 Phase 4: Strategy determination...");
   
   const strategy = await withTimeout(
@@ -92,5 +105,3 @@ export async function analyzeAsAutonomousAgent(
     agentThoughts
   };
 }
-
-export { withTimeout, sleep };

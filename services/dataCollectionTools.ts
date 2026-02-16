@@ -1,4 +1,3 @@
-
 import { getSettings } from './storage';
 import { performSinglePassScan } from './api';
 

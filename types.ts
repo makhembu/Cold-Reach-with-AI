@@ -1,4 +1,5 @@
 
+
 export enum BusinessStatus {
   DISCOVERED = 'DISCOVERED',
   ANALYZED = 'ANALYZED',

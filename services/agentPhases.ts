@@ -1,8 +1,11 @@
-
 import { Business, ReconnaissancePlan, CollectedData } from '../types';
 import { callHybridAI } from './hybridAI';
 import { captureScreenshotAPI, captureScreenshotAPIFlash, captureScreenshotOne, fetchAndAnalyzeHTML } from './dataCollectionTools';
 import { cleanJSONResponse, sleep } from './autonomousAgent';
+
+// ==========================================
+// PHASE 1: RECONNAISSANCE PLANNING
+// ==========================================
 
 export async function createReconnaissancePlan(
   business: Business,
@@ -67,6 +70,10 @@ Return ONLY valid JSON (no markdown):
     throw new Error(`Invalid plan: ${response.substring(0, 200)}`);
   }
 }
+
+// ==========================================
+// PHASE 2: EXECUTE RECONNAISSANCE PLAN
+// ==========================================
 
 export async function executeReconnaissancePlan(
   business: Business,

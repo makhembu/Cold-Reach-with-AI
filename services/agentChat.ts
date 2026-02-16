@@ -1,4 +1,3 @@
-
 import { Business } from '../types';
 import { callHybridAI } from './hybridAI';
 
@@ -7,6 +6,7 @@ export async function chatWithAgent(
   message: string, 
   history: Array<{ role: 'user' | 'agent', content: string, model?: string }>
 ) {
+  // Construct context for the AI
   const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
   const context = `
     You are an AI assistant analyzing the business "${business.name}" (${business.website}).
@@ -28,7 +28,7 @@ export async function chatWithAgent(
   return {
     message: response,
     modelUsed,
-    updatedAnalysis: null,
+    updatedAnalysis: null, // Logic to update analysis could be implemented here
     newScreenshot: null
   };
 }
