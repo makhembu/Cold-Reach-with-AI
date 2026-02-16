@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Wand2, RefreshCw, Eye, Code, Mail, Loader2, Image as ImageIcon, Gavel, MapPin, DollarSign, ShieldAlert, TrendingUp, ListChecks, FileText } from 'lucide-react';
+import { Wand2, RefreshCw, Eye, Code, Mail, Loader2, Image as ImageIcon, Gavel, MapPin, DollarSign, ShieldAlert, TrendingUp, ListChecks, FileText, ChevronRight } from 'lucide-react';
 import { getBusinesses, updateBusiness, getUserProfile } from '../services/storage';
 import { 
   generateMockupWithGemini, 
@@ -24,21 +23,20 @@ export const Generation: React.FC = () => {
     if (!selectedBusiness || !selectedBusiness.analysis) return;
     
     setGenerating(true);
-    setGenerationStep('Initializing...');
+    setGenerationStep('Initializing specialized agent...');
     
     const profile = getUserProfile();
     const isSecurityFocus = selectedBusiness.analysis.strategy?.focus === 'SECURITY';
 
     try {
-      // 1. Generate Asset (Mockup OR Report)
       let assetUpdates: any = {};
       
       if (isSecurityFocus) {
-        setGenerationStep('Compiling Security Audit Report...');
+        setGenerationStep('Compiling penetration test report...');
         const report = await generateSecurityReportWithGemini(selectedBusiness, selectedBusiness.analysis);
         assetUpdates.securityReportMd = report;
       } else {
-        setGenerationStep('Generating UI Mockup...');
+        setGenerationStep('Engineering UI solution...');
         let mockupHtml = selectedBusiness.assets?.mockupHtml;
         if (!mockupHtml) {
           mockupHtml = await generateMockupWithGemini(selectedBusiness, selectedBusiness.analysis);
@@ -47,18 +45,16 @@ export const Generation: React.FC = () => {
         assetUpdates.mockupTimestamp = Date.now();
       }
       
-      // 2. Initial Pitch Generation
-      setGenerationStep('Drafting Strategy Pitch...');
+      setGenerationStep('Drafting strategic outreach...');
       let currentPitch = await generatePitchWithGemini(selectedBusiness, selectedBusiness.analysis, profile);
       
-      // 3. AI Judge Loop
       let versions = 1;
       let score = 0;
       let critique = '';
       const MAX_RETRIES = 2;
       
       for (let i = 0; i <= MAX_RETRIES; i++) {
-        setGenerationStep(i === 0 ? 'AI Judge Evaluating...' : `Refining Pitch (Attempt ${i})...`);
+        setGenerationStep(i === 0 ? 'AI Judge evaluating draft...' : `Refining (Iteration ${i})...`);
         const judgment = await judgePitchWithGemini(selectedBusiness, currentPitch, selectedBusiness.analysis.strategy);
         score = judgment.score;
         critique = judgment.critique;
@@ -69,7 +65,7 @@ export const Generation: React.FC = () => {
         }
       }
 
-      setGenerationStep('Finalizing...');
+      setGenerationStep('Finalizing assets...');
       
       const updates = {
         status: BusinessStatus.GENERATED,
@@ -94,7 +90,7 @@ export const Generation: React.FC = () => {
       
     } catch (error) {
       console.error(error);
-      alert("Error generating assets. Check API Keys.");
+      alert("Asset generation failed. Check API configuration.");
     } finally {
       setGenerating(false);
       setGenerationStep('');
@@ -103,13 +99,13 @@ export const Generation: React.FC = () => {
 
   const JudgeBadge = ({ score }: { score?: number }) => {
     if (score === undefined) return null;
-    let color = 'bg-red-100 text-red-700';
-    if (score >= 8) color = 'bg-green-100 text-green-700';
-    else if (score >= 6) color = 'bg-yellow-100 text-yellow-700';
+    let color = 'bg-red-900/30 text-red-400 border-red-800';
+    if (score >= 8) color = 'bg-green-900/30 text-green-400 border-green-800';
+    else if (score >= 6) color = 'bg-yellow-900/30 text-yellow-400 border-yellow-800';
     return (
-      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${color}`}>
-        <Gavel size={14} />
-        <span>AI Score: {score}/10</span>
+      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
+        <Gavel size={12} />
+        <span>Quality Score: {score}/10</span>
       </div>
     );
   };
@@ -118,39 +114,35 @@ export const Generation: React.FC = () => {
     if (!strategy) return null;
     const isSecurity = strategy.focus === 'SECURITY';
     return (
-      <div className={`mb-6 p-5 rounded-xl border ${isSecurity ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-200'}`}>
+      <div className={`mb-6 p-6 rounded-xl border ${isSecurity ? 'bg-red-950/20 border-red-900/50' : 'bg-indigo-950/20 border-indigo-900/50'}`}>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className={`font-bold text-lg ${isSecurity ? 'text-red-900' : 'text-indigo-900'} flex items-center gap-2`}>
+            <h3 className={`font-bold text-lg ${isSecurity ? 'text-red-400' : 'text-indigo-400'} flex items-center gap-2 mb-2`}>
               {isSecurity ? <ShieldAlert size={20}/> : <TrendingUp size={20}/>}
               Strategy: {strategy.focus}
             </h3>
-            <p className="text-sm text-slate-600 mt-1">{strategy.rationale}</p>
+            <p className="text-sm text-slate-300">{strategy.rationale}</p>
           </div>
-          <div className="text-right">
-             <div className="flex items-center gap-1 text-sm font-bold text-slate-700 justify-end">
-               <MapPin size={14}/> {strategy.country}
+          <div className="text-right space-y-1">
+             <div className="flex items-center gap-1 text-xs font-bold text-slate-400 justify-end">
+               <MapPin size={12}/> {strategy.country}
              </div>
-             <div className="flex items-center gap-1 text-sm font-bold text-green-700 justify-end mt-1">
-               <DollarSign size={14}/> {strategy.suggestedPrice} Quote
+             <div className="flex items-center gap-1 text-sm font-bold text-green-400 justify-end">
+               <DollarSign size={14}/> {strategy.suggestedPrice}
              </div>
           </div>
         </div>
-        {isSecurity && strategy.vulnerabilityExplainer && (
-          <div className="bg-white p-3 rounded-lg border border-red-100 mb-3 text-sm text-red-800">
-             <span className="font-bold">Risk Explanation:</span> {strategy.vulnerabilityExplainer}
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
+        
+        <div className="space-y-3">
            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-             <ListChecks size={14}/> Suggested Roadmap
+             <ListChecks size={14}/> Execution Roadmap
            </h4>
-           <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+           <div className="flex flex-wrap gap-2">
              {strategy.roadmap?.map((step: string, i: number) => (
-               <React.Fragment key={i}>
-                 <span className="bg-white px-2 py-1 rounded shadow-sm border border-slate-200">{step}</span>
-                 {i < strategy.roadmap.length - 1 && <span className="text-slate-400">→</span>}
-               </React.Fragment>
+               <div key={i} className="flex items-center text-sm font-medium text-slate-300">
+                 <span className="bg-slate-900 px-3 py-1.5 rounded border border-slate-700">{step}</span>
+                 {i < strategy.roadmap.length - 1 && <ChevronRight size={14} className="mx-1 text-slate-600" />}
+               </div>
              ))}
            </div>
         </div>
@@ -160,12 +152,12 @@ export const Generation: React.FC = () => {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-6">
-      <div className="w-1/3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
-          <h3 className="font-bold text-slate-900">Opportunities</h3>
-          <p className="text-xs text-slate-500">Businesses with low scores ({businesses.length})</p>
+      <div className="w-1/3 bg-slate-900 rounded-xl border border-slate-800 flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-slate-800 bg-slate-950/50">
+          <h3 className="font-bold text-white">Target List</h3>
+          <p className="text-xs text-slate-500">Businesses needing intervention ({businesses.length})</p>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {businesses.map(b => (
             <div 
               key={b.id}
@@ -173,22 +165,22 @@ export const Generation: React.FC = () => {
                 setSelectedBusiness(b);
                 setPitch(b.assets?.emailSubject ? { subject: b.assets.emailSubject, body: b.assets.emailBody || '' } : null);
               }}
-              className={`p-3 rounded-lg cursor-pointer transition-all ${
+              className={`p-3 rounded-lg cursor-pointer transition-all border ${
                 selectedBusiness?.id === b.id 
-                  ? 'bg-brand-50 border border-brand-200' 
-                  : 'hover:bg-slate-50 border border-transparent'
+                  ? 'bg-blue-900/20 border-blue-800 text-blue-100' 
+                  : 'bg-transparent border-transparent hover:bg-slate-800 hover:border-slate-700 text-slate-300'
               }`}
             >
               <div className="flex justify-between items-start">
-                <h4 className="font-medium text-sm text-slate-900">{b.name}</h4>
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${b.analysis?.strategy?.focus === 'SECURITY' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                <h4 className="font-bold text-sm">{b.name}</h4>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${b.analysis?.strategy?.focus === 'SECURITY' ? 'bg-red-950 text-red-400 border border-red-900' : 'bg-slate-950 text-slate-500 border border-slate-800'}`}>
                   {b.analysis?.strategy?.focus || b.analysis?.overallScore}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 truncate">{b.website}</p>
+              <p className="text-xs opacity-60 mt-1 truncate">{b.website}</p>
               {b.status === BusinessStatus.GENERATED && (
-                <div className="flex items-center gap-1 mt-2 text-xs text-green-600 font-medium">
-                  <Wand2 size={12} /> Assets Ready
+                <div className="flex items-center gap-1 mt-2 text-[10px] text-green-400 font-bold uppercase tracking-wide">
+                  <Wand2 size={10} /> Ready
                 </div>
               )}
             </div>
@@ -196,41 +188,41 @@ export const Generation: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+      <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 flex flex-col overflow-hidden">
         {!selectedBusiness ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-            <Wand2 size={48} className="mb-4 opacity-50" />
-            <p>Select a business to generate strategic assets</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+            <Wand2 size={48} className="mb-4 opacity-20" />
+            <p>Select a target to begin asset generation</p>
           </div>
         ) : (
           <div className="flex-1 flex flex-col h-full">
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
               <div>
-                <h2 className="font-bold text-slate-900">{selectedBusiness.name}</h2>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <h2 className="font-bold text-lg text-white">{selectedBusiness.name}</h2>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
                    <span>Score: {selectedBusiness.analysis?.overallScore}/100</span>
                 </div>
               </div>
               <button
                 onClick={handleGenerateAssets}
                 disabled={generating}
-                className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors flex items-center gap-2 disabled:opacity-50 min-w-[160px] justify-center"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[180px] flex justify-center items-center gap-2 shadow-lg shadow-purple-900/20"
               >
                 {generating ? (
                   <>
                     <Loader2 className="animate-spin" size={16} />
-                    {generationStep}
+                    {generationStep || 'Processing...'}
                   </>
                 ) : (
                   <>
                     <Wand2 size={16} />
-                    {selectedBusiness.assets?.emailSubject ? 'Regenerate' : 'Generate'}
+                    {selectedBusiness.assets?.emailSubject ? 'Regenerate Assets' : 'Generate Assets'}
                   </>
                 )}
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-700">
               {selectedBusiness.analysis?.strategy && (
                 <StrategyCard strategy={selectedBusiness.analysis.strategy} />
               )}
@@ -238,35 +230,35 @@ export const Generation: React.FC = () => {
               <div className="space-y-8">
                 <section>
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                      <Mail size={16} /> Strategic Pitch
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      <Mail size={14} /> AI Drafted Pitch
                     </h3>
                     <JudgeBadge score={selectedBusiness.assets?.pitchScore} />
                   </div>
                   
                   {selectedBusiness.assets?.pitchCritique && (
-                     <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
-                       <span className="font-bold text-slate-800">AI Judge Critique:</span> {selectedBusiness.assets.pitchCritique}
+                     <div className="mb-4 p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-400">
+                       <span className="font-bold text-slate-300">Critique:</span> {selectedBusiness.assets.pitchCritique}
                      </div>
                   )}
 
                   {pitch ? (
-                    <div className="border border-slate-200 rounded-lg overflow-hidden">
-                      <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                        <p className="text-sm text-slate-500">Subject:</p>
-                        <p className="font-medium text-slate-900">{pitch.subject}</p>
+                    <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950">
+                      <div className="bg-slate-900 px-4 py-3 border-b border-slate-800">
+                        <span className="text-xs font-bold text-slate-500 uppercase mr-2">Subject:</span>
+                        <span className="font-medium text-slate-200 text-sm">{pitch.subject}</span>
                       </div>
-                      <div className="p-4 bg-white">
+                      <div className="p-4">
                         <textarea 
-                          className="w-full h-32 resize-none outline-none text-slate-700 text-sm leading-relaxed"
+                          className="w-full h-40 bg-transparent resize-none outline-none text-slate-300 text-sm leading-relaxed font-sans"
                           value={pitch.body}
                           readOnly
                         />
                       </div>
                     </div>
                   ) : (
-                    <div className="h-32 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 bg-slate-50">
-                      <p>No pitch generated yet</p>
+                    <div className="h-40 border-2 border-dashed border-slate-800 rounded-lg flex items-center justify-center text-slate-600 bg-slate-950/50">
+                      <p>Awaiting generation...</p>
                     </div>
                   )}
                 </section>
@@ -274,15 +266,15 @@ export const Generation: React.FC = () => {
                 {/* Conditional Asset Section */}
                 {selectedBusiness.analysis?.strategy?.focus === 'SECURITY' ? (
                   <section className="flex-1 flex flex-col min-h-[400px]">
-                    <h3 className="text-sm font-bold text-red-900 uppercase tracking-wider flex items-center gap-2 mb-3">
-                      <FileText size={16} /> Security Audit Report
+                    <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-2 mb-3">
+                      <FileText size={14} /> Security Audit Report
                     </h3>
                     {selectedBusiness.assets?.securityReportMd ? (
-                       <div className="flex-1 p-6 border border-red-200 bg-white rounded-lg shadow-sm font-mono text-xs overflow-y-auto whitespace-pre-wrap text-slate-800">
+                       <div className="flex-1 p-6 border border-red-900/30 bg-slate-950 rounded-lg shadow-inner font-mono text-xs overflow-y-auto whitespace-pre-wrap text-slate-300">
                          {selectedBusiness.assets.securityReportMd}
                        </div>
                     ) : (
-                      <div className="flex-1 border-2 border-dashed border-red-100 rounded-lg flex items-center justify-center text-red-300 bg-red-50">
+                      <div className="flex-1 border-2 border-dashed border-red-900/20 rounded-lg flex items-center justify-center text-red-900/40 bg-red-950/5">
                         <p>Generate report to view audit details</p>
                       </div>
                     )}
@@ -290,8 +282,8 @@ export const Generation: React.FC = () => {
                 ) : (
                   <section className="h-[500px] flex flex-col">
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                        <Code size={16} /> Solution Mockup
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <Code size={14} /> Solution Preview
                       </h3>
                       {selectedBusiness.assets?.mockupHtml && (
                         <button 
@@ -300,14 +292,14 @@ export const Generation: React.FC = () => {
                             const url = URL.createObjectURL(blob);
                             window.open(url, '_blank');
                           }}
-                          className="text-xs bg-slate-100 px-3 py-1 rounded hover:bg-slate-200"
+                          className="text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors uppercase tracking-wide"
                         >
-                          Open in New Tab
+                          Open Fullscreen
                         </button>
                       )}
                     </div>
                     {selectedBusiness.assets?.mockupHtml ? (
-                      <div className="flex-1 border border-slate-300 rounded-lg overflow-hidden shadow-sm bg-white">
+                      <div className="flex-1 border border-slate-700 rounded-lg overflow-hidden shadow-lg bg-white relative">
                         <iframe 
                           srcDoc={selectedBusiness.assets.mockupHtml}
                           title="Mockup Preview"
@@ -316,8 +308,8 @@ export const Generation: React.FC = () => {
                         />
                       </div>
                     ) : (
-                      <div className="flex-1 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 bg-slate-50">
-                        <p>No solution generated yet</p>
+                      <div className="flex-1 border-2 border-dashed border-slate-800 rounded-lg flex items-center justify-center text-slate-600 bg-slate-950/50">
+                        <p>Awaiting generation...</p>
                       </div>
                     )}
                   </section>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Send, CheckCircle2, Clock, X, ExternalLink, Gavel, AlertTriangle, Monitor, Loader2 } from 'lucide-react';
+import { Mail, Send, CheckCircle2, Clock, X, ExternalLink, Gavel, Monitor, Loader2 } from 'lucide-react';
 import { getBusinesses, updateBusiness, getSettings } from '../services/storage';
 import { sendEmailViaResend } from '../services/api';
 import { Business, BusinessStatus } from '../types';
@@ -28,7 +28,6 @@ export const Outreach: React.FC = () => {
 
     try {
       if (config.provider === 'resend') {
-        // Use Resend API
         await sendEmailViaResend(
           selectedReview.email, 
           editedSubject, 
@@ -37,13 +36,11 @@ export const Outreach: React.FC = () => {
         );
         alert(`Email successfully sent via Resend to ${selectedReview.email}`);
       } else {
-        // Default to Mailto for 'gmail' or 'smtp' (as client-side SMTP isn't real)
         const subject = encodeURIComponent(editedSubject);
         const body = encodeURIComponent(editedBody);
         window.open(`mailto:${selectedReview.email}?subject=${subject}&body=${body}`, '_blank');
       }
 
-      // Update State
       updateBusiness(selectedReview.id, { 
         status: BusinessStatus.CONTACTED,
         outreach: {
@@ -80,52 +77,52 @@ export const Outreach: React.FC = () => {
     const settings = getSettings();
     
     return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-6xl h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-slate-900 w-full max-w-6xl h-[90vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden border border-slate-800">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Approve Campaign</h2>
-              <p className="text-sm text-slate-500">
-                Sending via <span className="font-bold uppercase">{settings.emailConfig.provider}</span>
+              <h2 className="text-xl font-bold text-white">Campaign Approval</h2>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">
+                Channel: <span className="text-blue-400">{settings.emailConfig.provider}</span>
               </p>
             </div>
-            <button onClick={() => setSelectedReview(null)} className="p-2 hover:bg-slate-200 rounded-full">
-              <X size={24} className="text-slate-500" />
+            <button onClick={() => setSelectedReview(null)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+              <X size={24} className="text-slate-500 hover:text-white" />
             </button>
           </div>
 
           <div className="flex-1 flex overflow-hidden">
             {/* Left Col: Context */}
-            <div className="w-1/4 bg-slate-50 p-6 border-r border-slate-200 overflow-y-auto hidden lg:block">
+            <div className="w-1/4 bg-slate-950 p-6 border-r border-slate-800 overflow-y-auto hidden lg:block">
               <div className="mb-6">
-                <h3 className="font-bold text-slate-900 mb-2">Target Business</h3>
-                <div className="space-y-1 text-sm text-slate-600">
-                  <p className="font-medium text-slate-900">{selectedReview.name}</p>
-                  <p>{selectedReview.email}</p>
-                  <a href={selectedReview.website} target="_blank" className="text-brand-600 hover:underline flex items-center gap-1 mt-1">
-                    Visit Website <ExternalLink size={12}/>
+                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Target Profile</h3>
+                <div className="space-y-1 text-sm">
+                  <p className="font-bold text-slate-200 text-lg">{selectedReview.name}</p>
+                  <p className="text-slate-400 font-mono text-xs">{selectedReview.email}</p>
+                  <a href={selectedReview.website} target="_blank" className="text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 text-xs font-medium">
+                    Visit Website <ExternalLink size={10}/>
                   </a>
                 </div>
               </div>
 
               <div className="mb-6">
-                <h3 className="font-bold text-slate-900 mb-2">Analysis</h3>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold mb-3 ${selectedReview.analysis?.overallScore! < 50 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Analysis Summary</h3>
+                <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 border ${selectedReview.analysis?.overallScore! < 50 ? 'bg-red-950/50 text-red-400 border-red-900' : 'bg-yellow-950/50 text-yellow-400 border-yellow-900'}`}>
                   Score: {selectedReview.analysis?.overallScore}/100
                 </div>
-                <ul className="text-xs list-disc pl-4 text-slate-600 space-y-1">
+                <ul className="text-xs list-disc pl-4 text-slate-400 space-y-2">
                    {selectedReview.analysis?.criticalIssues.slice(0,3).map((issue,i) => <li key={i}>{issue}</li>)}
                 </ul>
               </div>
             </div>
 
             {/* Middle Col: Mockup */}
-            <div className="w-1/3 border-r border-slate-200 flex flex-col hidden lg:flex">
-              <div className="p-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 flex items-center gap-2">
-                <Monitor size={14} /> LANDING PAGE MOCKUP
+            <div className="w-1/3 border-r border-slate-800 flex flex-col hidden lg:flex bg-slate-900">
+              <div className="p-3 bg-slate-950 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
+                <Monitor size={12} /> Asset Preview
               </div>
-              <div className="flex-1 bg-white relative">
+              <div className="flex-1 relative bg-white">
                 {selectedReview.assets?.mockupHtml ? (
                   <iframe 
                     srcDoc={selectedReview.assets.mockupHtml}
@@ -133,57 +130,57 @@ export const Outreach: React.FC = () => {
                     title="Mockup"
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-slate-400">No Mockup</div>
+                  <div className="flex items-center justify-center h-full text-slate-400 bg-slate-900">No Visual Asset</div>
                 )}
               </div>
             </div>
 
             {/* Right Col: Editor */}
-            <div className="flex-1 flex flex-col bg-white">
-              <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+            <div className="flex-1 flex flex-col bg-slate-900">
+              <div className="p-4 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
                  <div className="flex items-center gap-2">
-                   <Mail size={16} className="text-brand-600"/>
-                   <span className="font-bold text-slate-800">Review Pitch</span>
+                   <Mail size={16} className="text-blue-400"/>
+                   <span className="font-bold text-slate-200 text-sm">Review Message</span>
                  </div>
-                 <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${score >= 8 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                   <Gavel size={12}/> AI Score: {score}/10
+                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${score >= 8 ? 'bg-green-950 text-green-400 border-green-900' : 'bg-yellow-950 text-yellow-400 border-yellow-900'}`}>
+                   <Gavel size={10}/> Quality: {score}/10
                  </div>
               </div>
 
               <div className="flex-1 p-6 overflow-y-auto space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Subject Line</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Subject Line</label>
                   <input 
                     type="text" 
                     value={editedSubject}
                     onChange={(e) => setEditedSubject(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded focus:border-brand-500 outline-none font-medium text-slate-900"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg focus:border-blue-500 outline-none font-medium text-slate-200 text-sm"
                   />
                 </div>
                 <div className="h-full">
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Email Body</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Message Body</label>
                   <textarea 
                     value={editedBody}
                     onChange={(e) => setEditedBody(e.target.value)}
-                    className="w-full h-64 p-3 border border-slate-300 rounded focus:border-brand-500 outline-none text-slate-700 text-sm leading-relaxed resize-none font-mono"
+                    className="w-full h-80 p-4 bg-slate-950 border border-slate-800 rounded-lg focus:border-blue-500 outline-none text-slate-300 text-sm leading-relaxed resize-none font-sans"
                   />
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+              <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end gap-3">
                 <button 
                   onClick={() => setSelectedReview(null)}
-                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors"
+                  className="px-4 py-2 text-slate-400 font-bold text-xs uppercase hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleSend}
                   disabled={sending}
-                  className="px-6 py-2 bg-brand-600 text-white font-bold rounded-lg hover:bg-brand-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-70"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 text-sm"
                 >
                   {sending ? <Loader2 className="animate-spin" size={16}/> : <Send size={16} />}
-                  {settings.emailConfig.provider === 'resend' ? 'Send via Resend' : 'Launch Mail Client'}
+                  {settings.emailConfig.provider === 'resend' ? 'Send via API' : 'Launch Mail Client'}
                 </button>
               </div>
             </div>
@@ -198,47 +195,47 @@ export const Outreach: React.FC = () => {
       <ReviewModal />
       
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Outreach Campaigns</h2>
-        <p className="text-slate-500 mt-1">Review generated assets and launch campaigns</p>
+        <h2 className="text-3xl font-black text-white">Campaign Management</h2>
+        <p className="text-slate-400 mt-1">Deploy outreach to approved targets</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
+        <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm">
-                <th className="px-6 py-4 font-medium">Business</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Judge Score</th>
-                <th className="px-6 py-4 font-medium text-right">Action</th>
+              <tr className="bg-slate-950 border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                <th className="px-6 py-4">Target Entity</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Asset Quality</th>
+                <th className="px-6 py-4 text-right">Command</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-800">
               {businesses.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                    No campaigns ready. Generate pitches first.
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                    No active campaigns. Generate assets in the Agent Lab first.
                   </td>
                 </tr>
               ) : (
                 businesses.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50">
+                  <tr key={b.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
-                      <p className="font-semibold text-slate-900">{b.name}</p>
-                      <p className="text-xs text-slate-500">{b.category}</p>
+                      <p className="font-bold text-slate-200">{b.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">{b.category}</p>
                     </td>
                     <td className="px-6 py-4">
                       {b.status === BusinessStatus.CONTACTED ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                          <CheckCircle2 size={12} /> Sent
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-950/50 text-green-400 border border-green-900">
+                          <CheckCircle2 size={12} /> SENT
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                          <Clock size={12} /> Pending
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-950/50 text-blue-400 border border-blue-900">
+                          <Clock size={12} /> READY
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${b.assets?.pitchScore && b.assets.pitchScore >= 8 ? 'text-green-700 bg-green-50' : 'text-yellow-700 bg-yellow-50'}`}>
+                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border ${b.assets?.pitchScore && b.assets.pitchScore >= 8 ? 'text-green-400 bg-green-950/30 border-green-900' : 'text-yellow-400 bg-yellow-950/30 border-yellow-900'}`}>
                          <Gavel size={12}/> {b.assets?.pitchScore || 0}/10
                        </span>
                     </td>
@@ -246,9 +243,9 @@ export const Outreach: React.FC = () => {
                       {b.status !== BusinessStatus.CONTACTED && (
                         <button 
                           onClick={() => openReview(b)}
-                          className="bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-slate-800 transition-colors inline-flex items-center gap-1"
+                          className="bg-slate-100 hover:bg-white text-slate-900 px-4 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 inline-flex items-center gap-1"
                         >
-                          Review & Send
+                          Review & Launch
                         </button>
                       )}
                     </td>

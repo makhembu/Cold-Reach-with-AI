@@ -1,29 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Loader2, Sparkles, AlertCircle, ArrowRight, Globe, Database } from 'lucide-react';
+import { Search, MapPin, Loader2, Sparkles, AlertCircle, ArrowRight, Globe, Database, RefreshCw } from 'lucide-react';
 import { addBusiness, getUserProfile, getSettings } from '../services/storage';
 import { getDiscoverySuggestions, searchBusinessesWithGemini } from '../services/geminiService';
 import { Business } from '../types';
 
 export const Discovery: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Business[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [profile] = useState(getUserProfile());
 
   useEffect(() => {
-    loadSuggestions();
+    // Try load from cache first
+    const cached = localStorage.getItem('coldreach_suggestions');
+    if (cached) {
+      setSuggestions(JSON.parse(cached));
+    } else {
+      loadSuggestions();
+    }
   }, []);
 
   const loadSuggestions = async () => {
+    if (!profile.businessName || !getSettings().geminiApiKey) return;
+    
+    setSuggestionsLoading(true);
     try {
-      const profile = getUserProfile();
-      if (profile.businessName && getSettings().geminiApiKey) {
-        const suggs = await getDiscoverySuggestions(profile);
-        setSuggestions(suggs);
-      }
+      const suggs = await getDiscoverySuggestions(profile);
+      setSuggestions(suggs);
+      localStorage.setItem('coldreach_suggestions', JSON.stringify(suggs));
     } catch (e) {
       console.log("Failed to load suggestions", e);
+    } finally {
+      setSuggestionsLoading(false);
     }
   };
 
@@ -38,7 +49,7 @@ export const Discovery: React.FC = () => {
     try {
       const businesses = await searchBusinessesWithGemini(query);
       if (businesses.length === 0) {
-        setError("No signals found in this sector.");
+        setError("No signals found in this sector. Try a broader query.");
       } else {
         businesses.forEach(b => addBusiness(b));
         setResults(businesses);
@@ -66,7 +77,7 @@ export const Discovery: React.FC = () => {
               <Search className="absolute left-5 text-slate-500" size={24} />
               <input
                 type="text"
-                placeholder="Enter scan parameters (e.g. 'Dentists in Seattle with bad websites')"
+                placeholder="Enter scan parameters (e.g. 'Dentists in Seattle')"
                 className="w-full pl-14 pr-32 py-5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-lg text-slate-100 placeholder-slate-600 shadow-inner transition-all"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
@@ -88,21 +99,39 @@ export const Discovery: React.FC = () => {
           </form>
 
           {/* Suggestions */}
-          {suggestions.length > 0 && (
+          {(suggestions.length > 0 || suggestionsLoading) && (
             <div className="max-w-3xl mx-auto mt-6">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Sparkles size={12} className="text-purple-400" /> AI Recommended Vectors
-              </h3>
+              <div className="flex justify-between items-center mb-3">
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                   <Sparkles size={12} className="text-purple-400" /> 
+                   Strategy for: <span className="text-slate-300">{profile.businessName || 'Agent'}</span>
+                 </h3>
+                 <button 
+                   onClick={loadSuggestions} 
+                   disabled={suggestionsLoading}
+                   className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 disabled:opacity-50"
+                 >
+                   <RefreshCw size={10} className={suggestionsLoading ? "animate-spin" : ""} /> Regenerate
+                 </button>
+              </div>
+              
               <div className="flex flex-wrap gap-2">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setQuery(s)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-full border border-slate-700 hover:border-slate-600 transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
+                {suggestionsLoading ? (
+                  <div className="text-slate-500 text-xs flex items-center gap-2">
+                    <Loader2 size={12} className="animate-spin" /> Analyzing market opportunities...
+                  </div>
+                ) : (
+                  suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setQuery(s)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-full border border-slate-700 hover:border-slate-600 transition-colors animate-in fade-in slide-in-from-bottom-2"
+                      style={{ animationDelay: `${i * 100}ms` }}
+                    >
+                      {s}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           )}

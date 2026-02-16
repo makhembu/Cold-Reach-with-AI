@@ -1,3 +1,4 @@
+
 import { Business, BusinessStatus, Settings, UserProfile } from '../types';
 
 const KEYS = {
@@ -27,19 +28,24 @@ const DEFAULT_PROFILE: UserProfile = {
   onboardingCompleted: false
 };
 
+// Safe storage wrapper to handle quota limits
 const safeSetItem = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch (e: any) {
     if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
       console.warn("LocalStorage Quota Exceeded. Attempting to cleanup...");
+      // Try to clean up businesses that are just discovered but old? 
+      // Or just warn user. For now, we'll try to strip heavy logs/screenshots from the payload being saved.
+      
       if (key === KEYS.BUSINESSES) {
         try {
+          // Parse the businesses, strip screenshots/logs from older ones
           const businesses: Business[] = JSON.parse(value);
           const slimBusinesses = businesses.map(b => ({
             ...b,
-            screenshot: undefined, 
-            logs: undefined        
+            screenshot: undefined, // Drop screenshots to save space
+            logs: undefined        // Drop logs
           }));
           localStorage.setItem(key, JSON.stringify(slimBusinesses));
           alert("Storage full! Screenshots were removed to save your data.");
