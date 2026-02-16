@@ -23,39 +23,42 @@ TARGET:
 - Location: ${business.address || 'Unknown'}
 
 AVAILABLE TOOLS:
-1. screenshot_tool(url) - Captures a visual snapshot of the site (auto-selects best service).
+1. screenshot_tool(url) - Captures a visual snapshot of the site.
 2. fetch_html(url) - Get HTML, extract emails/phones/tech.
 
-TASK: Create reconnaissance plan.
+TASK: Create a robust reconnaissance plan.
 
-Think strategically:
-- What data do I NEED?
-- Homepage screenshot is obvious, but what else?
-- Should I check /services, /contact pages?
-- Category-specific concerns? (restaurants→mobile, lawyers→security)
-
-Be SMART. Don't waste API calls.
+MANDATORY STRATEGY:
+1. ALWAYS target the Homepage for a screenshot and HTML analysis.
+2. ALWAYS check for a 'Contact' or 'About' page (e.g., /contact, /about-us) and schedule a 'fetch_html' on it to find hidden emails.
+3. If the homepage screenshot is critical, give it priority 1.
 
 Return ONLY valid JSON (no markdown):
 {
-  "strategy": "Your approach in 2-3 sentences",
-  "reasoning": "Why this makes sense for THIS business",
+  "strategy": "Your strategy summary (e.g. 'Scan homepage and check contact page for direct leads')",
+  "reasoning": "Why this plan maximizes data collection",
   "tools_needed": [
     {
       "tool": "screenshot_tool",
       "target": "${business.website}",
-      "reason": "Specific reason",
+      "reason": "Visual assessment",
       "priority": 1
     },
     {
       "tool": "fetch_html",
       "target": "${business.website}",
-      "reason": "Specific reason",
+      "reason": "Tech stack & email extraction",
+      "priority": 1
+    },
+    {
+      "tool": "fetch_html",
+      "target": "${business.website}/contact",
+      "reason": "Find direct contact info",
       "priority": 2
     }
   ],
-  "focus_areas": ["design", "mobile", "performance"],
-  "estimated_time": "90 seconds"
+  "focus_areas": ["design", "mobile_responsiveness", "conversion_paths"],
+  "estimated_time": "45 seconds"
 }`;
 
   thoughts.push("Creating plan...");

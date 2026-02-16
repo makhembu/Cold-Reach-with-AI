@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Bot, Brain, MessageSquare, RefreshCw, Terminal, AlertCircle, CheckCircle2, Activity, Database, Globe, Zap, TrendingUp, Clock, Cpu, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import { Play, Bot, Brain, MessageSquare, RefreshCw, Terminal, AlertCircle, CheckCircle2, Activity, Database, Globe, Zap, TrendingUp, Clock, Cpu, ChevronDown, ChevronRight, Eye, FileCode, X } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
 import { analyzeAsAutonomousAgent } from '../services/autonomousAgent';
 import { chatWithAgent } from '../services/agentChat';
 import { getAPIUsageStatus } from '../services/hybridAI';
-import { Business, BusinessStatus, ChatMessage } from '../types';
+import { Business, BusinessStatus, ChatMessage, CollectedData } from '../types';
 
 const AgentStatus = ({ status }: { status: string }) => {
   const configs: Record<string, any> = {
@@ -78,6 +78,91 @@ const TerminalLogs = ({ logs, modelUsed, collapsed = false }: { logs: string[], 
           <div className="animate-pulse">_</div>
         </div>
       )}
+    </div>
+  );
+};
+
+const DataInspector = ({ data, onClose }: { data: CollectedData, onClose: () => void }) => {
+  const [selectedUrl, setSelectedUrl] = useState(Object.keys(data)[0]);
+  const currentData = data[selectedUrl];
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 w-full max-w-5xl h-[85vh] rounded-xl border border-slate-800 flex flex-col shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-xl">
+           <h3 className="font-bold text-white flex items-center gap-2">
+             <Database size={16} className="text-blue-400" /> Raw Intelligence Data
+           </h3>
+           <button onClick={onClose}><X size={20} className="text-slate-500 hover:text-white" /></button>
+        </div>
+        <div className="flex-1 flex overflow-hidden">
+           {/* Sidebar URLs */}
+           <div className="w-64 bg-slate-950 border-r border-slate-800 p-2 overflow-y-auto">
+              {Object.keys(data).map(url => (
+                <button 
+                  key={url}
+                  onClick={() => setSelectedUrl(url)}
+                  className={`w-full text-left p-3 rounded-lg text-xs font-mono break-all mb-1 transition-colors ${selectedUrl === url ? 'bg-blue-900/30 text-blue-300 border border-blue-800' : 'text-slate-500 hover:bg-slate-900'}`}
+                >
+                  {url}
+                </button>
+              ))}
+           </div>
+           {/* Content */}
+           <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900">
+              {!currentData ? (
+                <div className="text-center text-slate-500 mt-20">Select a source to view data</div>
+              ) : (
+                <>
+                  {/* Screenshot */}
+                  {currentData.screenshot && (
+                    <div className="space-y-2">
+                       <h4 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Eye size={12}/> Visual Capture</h4>
+                       <img src={currentData.screenshot} className="w-full rounded border border-slate-700 shadow-lg" alt="Capture" />
+                    </div>
+                  )}
+                  
+                  {/* Extracted Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="bg-slate-950 p-4 rounded border border-slate-800">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Emails Found</h4>
+                        {currentData.emails && currentData.emails.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {currentData.emails.map((e:string, i:number) => <span key={i} className="text-xs bg-slate-900 text-slate-300 px-2 py-1 rounded border border-slate-700">{e}</span>)}
+                          </div>
+                        ) : <span className="text-xs text-slate-600">None detected</span>}
+                     </div>
+                     <div className="bg-slate-950 p-4 rounded border border-slate-800">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Tech Stack</h4>
+                        {currentData.techStack && currentData.techStack.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {currentData.techStack.map((t:string, i:number) => <span key={i} className="text-xs bg-slate-900 text-slate-300 px-2 py-1 rounded border border-slate-700">{t}</span>)}
+                          </div>
+                        ) : <span className="text-xs text-slate-600">Unknown</span>}
+                     </div>
+                  </div>
+
+                  {/* HTML Viewer */}
+                  <div className="space-y-2">
+                     <h4 className="text-xs font-bold text-slate-400 uppercase flex items-center justify-between">
+                       <span className="flex items-center gap-2"><FileCode size={12}/> HTML Content</span>
+                       <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">{currentData.html?.length || 0} chars</span>
+                     </h4>
+                     <div className="h-64 bg-slate-950 rounded border border-slate-800 p-3 overflow-auto relative group">
+                        {currentData.html ? (
+                            <pre className="text-[10px] font-mono text-slate-400 whitespace-pre-wrap break-all">
+                                {currentData.html}
+                            </pre>
+                        ) : (
+                            <div className="text-slate-600 text-xs italic">No HTML content captured</div>
+                        )}
+                     </div>
+                  </div>
+                </>
+              )}
+           </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -179,7 +264,7 @@ const AgentChat = ({ business, onUpdate }: { business: Business, onUpdate: () =>
   );
 };
 
-const AnalysisDisplay = ({ analysis, business }: { analysis: any, business: Business }) => {
+const AnalysisDisplay = ({ analysis, business, onInspect }: { analysis: any, business: Business, onInspect: () => void }) => {
   if (!analysis.professionalAssessment) return null;
   const verdictColors: Record<string, string> = {
     'CRITICAL_REDESIGN_NEEDED': 'from-red-900/40 to-red-950/40 border-red-700/50',
@@ -236,7 +321,17 @@ const AnalysisDisplay = ({ analysis, business }: { analysis: any, business: Busi
       <div className={`bg-gradient-to-br ${vc} rounded-lg border p-4`}>
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1 pr-4">
-            <div className="text-4xl font-black text-slate-100">{analysis.overallScore}<span className="text-xl opacity-50">/100</span></div>
+            <div className="flex items-center gap-3">
+                <div className="text-4xl font-black text-slate-100">{analysis.overallScore}<span className="text-xl opacity-50">/100</span></div>
+                {business.agentAnalysis && (
+                  <button 
+                    onClick={onInspect}
+                    className="flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-[10px] font-bold border border-white/10 transition-colors"
+                  >
+                    <Database size={10} /> Inspect Data
+                  </button>
+                )}
+            </div>
             <div className="text-xs opacity-80 uppercase tracking-wider font-bold text-slate-200 mt-1">{analysis.verdict?.replace(/_/g, ' ')}</div>
           </div>
           {visualContent()}
@@ -280,6 +375,7 @@ export const Analysis: React.FC = () => {
   const [status, setStatus] = useState<string>('idle');
   const [liveLogs, setLiveLogs] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
+  const [inspectingData, setInspectingData] = useState<CollectedData | null>(null);
   const [usage, setUsage] = useState({ 
     gemini: { used: 0, limit: 1500, remaining: 1500 }, 
     deepseek: { used: 0, limit: 999999, remaining: 999999 },
@@ -357,6 +453,13 @@ export const Analysis: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 rounded-xl overflow-hidden">
+      {inspectingData && (
+        <DataInspector 
+          data={inspectingData} 
+          onClose={() => setInspectingData(null)} 
+        />
+      )}
+      
       <div className="max-w-6xl mx-auto p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -419,7 +522,11 @@ export const Analysis: React.FC = () => {
               
               {business.analysis && analyzingId !== business.id && (
                 <div className="p-4 pt-0 space-y-4">
-                  <AnalysisDisplay analysis={business.analysis} business={business} />
+                  <AnalysisDisplay 
+                    analysis={business.analysis} 
+                    business={business} 
+                    onInspect={() => setInspectingData(business.agentAnalysis?.collectedData || null)}
+                  />
                   <AgentChat business={business} onUpdate={() => setBusinesses(getBusinesses())} />
                 </div>
               )}

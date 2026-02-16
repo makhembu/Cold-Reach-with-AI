@@ -79,7 +79,14 @@ export async function analyzeAsAutonomousAgent(
     agentThoughts
   );
   
-  const dataKeys = Object.keys(collectedData).filter(k => !collectedData[k].error);
+  // Filter for valid data, but be permissive - if we got a screenshot OR html, keep it
+  const dataKeys = Object.keys(collectedData).filter(k => {
+    const d = collectedData[k];
+    const hasScreenshot = !!d.screenshot && d.screenshot.length > 100;
+    const hasHtml = !!d.html && d.html.length > 50;
+    return hasScreenshot || hasHtml;
+  });
+
   if (dataKeys.length === 0) {
       onLog("⚠️ No valid data collected. Proceeding with limited inference.");
       // Create a dummy data point so analysis doesn't crash
