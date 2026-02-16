@@ -53,14 +53,17 @@ export async function withTimeout<T>(
 
 export const performSinglePassScan = async (url: string): Promise<ScanResult> => {
   try {
+    // Attempt to call the backend API
     const response = await axios.post('/api/scan', { url }, { 
-      timeout: 40000, // Client side timeout slightly larger than server
+      timeout: 45000, 
       validateStatus: () => true 
     });
 
     if (response.status === 200 && response.data.success) {
       return response.data as ScanResult;
     } else {
+      console.warn("Backend scan failed, falling back to client-side analysis:", response.data.error);
+      // Fallback object to allow the app to continue even if backend fails
       return {
         success: false,
         error: response.data.error || `Scan failed with status ${response.status}`,
@@ -68,6 +71,7 @@ export const performSinglePassScan = async (url: string): Promise<ScanResult> =>
       };
     }
   } catch (error: any) {
+    console.warn("Backend unavailable, using limited client-side data.", error);
     return {
       success: false,
       error: error.message || "Network connection failed",
@@ -93,23 +97,49 @@ export const performFullAudit = async (url: string) => {
 };
 
 export const fetchRawHtml = async (url: string): Promise<string> => {
+  // Ensure protocol
+  let targetUrl = url;
+  if (!targetUrl.startsWith('http')) {
+    targetUrl = 'https://' + targetUrl;
+  }
+
+  // List of proxies to try
   const proxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    // Fallback: Direct fetch (works for some configured CORS sites)
+    (u: string) => u
   ];
 
-  for (const proxy of proxies) {
+  for (const proxyGenerator of proxies) {
     try {
-      const response = await fetch(proxy);
+      const proxyUrl = proxyGenerator(targetUrl);
+      console.log(`Attempting fetch via: ${proxyUrl}`);
+      
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      
+      const response = await fetch(proxyUrl, { 
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      clearTimeout(id);
+
       if (response.ok) {
         const text = await response.text();
-        if (text.length > 100) return text;
+        if (text && text.length > 50) return text;
       }
     } catch (error) {
+      console.warn(`Fetch failed for proxy`, error);
       continue;
     }
   }
-  return "";
+
+  console.error(`All proxies failed for ${targetUrl}`);
+  return ""; 
 };
 
 export const sendEmailViaResend = async (

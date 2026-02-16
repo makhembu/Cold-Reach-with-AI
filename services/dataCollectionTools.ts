@@ -1,134 +1,43 @@
-import { getSettings } from './storage';
-import { performSinglePassScan } from './api';
 
-export async function captureScreenshotOne(url: string): Promise<string> {
-  const settings = getSettings();
-  const accessKey = settings.screenshotOneAccessKey;
-
-  if (!accessKey) {
-     const result = await performSinglePassScan(url);
-     if (result.success && result.data?.screenshot) return result.data.screenshot;
-     throw new Error('ScreenshotOne Access Key missing and fallback failed');
-  }
-
-  const params = new URLSearchParams({
-    access_key: accessKey,
-    url: url,
-    full_page: 'true',
-    response_type: 'image', // Assuming image return based on docs
-    format: 'jpg',
-    image_quality: '80',
-    block_ads: 'true',
-    block_cookie_banners: 'true',
-    block_trackers: 'true',
-    wait_for_selector: 'body'
-  });
-
-  const apiUrl = `https://api.screenshotone.com/take?${params.toString()}`;
-
-  const response = await fetch(apiUrl);
-
-  if (!response.ok) {
-    throw new Error(`ScreenshotOne failed: ${response.status} ${response.statusText}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
-
-  return `data:image/jpeg;base64,${base64}`;
-}
-
-export async function captureScreenshotAPI(url: string): Promise<string> {
-  const settings = getSettings();
-  const token = settings.screenshotApiToken;
-  
-  if (!token) {
-    const result = await performSinglePassScan(url);
-    if (result.success && result.data?.screenshot) return result.data.screenshot;
-    throw new Error('ScreenshotAPI token missing and fallback failed');
-  }
-  
-  const apiUrl = `https://shot.screenshotapi.net/screenshot?` + new URLSearchParams({
-    token: token,
-    url: url,
-    full_page: 'true',
-    output: 'image',
-    file_type: 'png',
-    wait_for_event: 'load',
-    delay: '2000'
-  });
-  
-  const response = await fetch(apiUrl);
-  
-  if (!response.ok) {
-    throw new Error(`ScreenshotAPI failed: ${response.status}`);
-  }
-  
-  const buffer = await response.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
-  
-  return `data:image/png;base64,${base64}`;
-}
-
-export async function captureScreenshotAPIFlash(url: string): Promise<string> {
-  const settings = getSettings();
-  const apiKey = settings.apiflashKey;
-  
-  if (!apiKey) {
-      const result = await performSinglePassScan(url);
-      if (result.success && result.data?.screenshot) return result.data.screenshot;
-      throw new Error('ApiFlash key missing and fallback failed');
-  }
-  
-  const apiUrl = `https://api.apiflash.com/v1/urltoimage?` + new URLSearchParams({
-    access_key: apiKey,
-    url: url,
-    full_page: 'true',
-    fresh: 'true',
-    response_type: 'image',
-    format: 'jpeg',
-    quality: '80',
-    delay: '2',
-    wait_until: 'page_loaded'
-  });
-  
-  const response = await fetch(apiUrl);
-  
-  if (!response.ok) {
-    throw new Error(`ApiFlash failed: ${response.status}`);
-  }
-  
-  const buffer = await response.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
-  
-  return `data:image/jpeg;base64,${base64}`;
-}
+import { performSinglePassScan, fetchRawHtml } from './api';
 
 export async function fetchAndAnalyzeHTML(url: string) {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
   let html = '';
 
   try {
-      const response = await fetch(proxyUrl);
-      if (response.ok) {
-          html = await response.text();
-      }
+      // Use the robust fetcher from API service
+      html = await fetchRawHtml(url);
   } catch (e) {
+      console.warn("fetchRawHtml failed, trying scan fallback", e);
+  }
+
+  // If fetch failed, try the backend scan (even if it might 500, worth a shot)
+  if (!html || html.length < 100) {
       const result = await performSinglePassScan(url);
       if (result.success && result.data) {
           html = result.data.html;
-      } else {
-          throw new Error(`Failed to fetch ${url}`);
       }
   }
 
-  if (!html) throw new Error("Empty HTML response");
+  // If still empty, we can't do much, but we shouldn't throw if we can avoid it.
+  // We return a basic object so the analysis can proceed with "No Data" mode.
+  if (!html) {
+      console.warn(`Failed to fetch HTML for ${url}. Returning empty analysis.`);
+      return {
+        html: '',
+        htmlLength: 0,
+        headers: {},
+        emails: [],
+        phoneNumbers: [],
+        techStack: [],
+        hasViewport: false,
+        hasSSL: url.startsWith('https'),
+        pageTitle: 'Unknown',
+        metaDescription: '',
+        server: 'Unknown',
+        error: 'Could not access website content'
+      };
+  }
   
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const emails = Array.from(new Set(html.match(emailRegex) || []))

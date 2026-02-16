@@ -1,9 +1,22 @@
+
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
 
 export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -18,18 +31,11 @@ export default async function handler(req, res) {
   try {
     const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
     
+    // Check if running locally or in Vercel
     const executablePath = await chromium.executablePath();
 
     browser = await puppeteer.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process',
-        '--no-zygote'
-      ],
+      args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: executablePath || process.env.PUPPETEER_EXECUTABLE_PATH,
       headless: chromium.headless,
@@ -39,8 +45,11 @@ export default async function handler(req, res) {
     const page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 900 });
     
+    // Set user agent to avoid bot detection
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
     // Increase timeout for heavy sites
-    const timeout = 30000;
+    const timeout = 25000;
     const response = await page.goto(formattedUrl, { waitUntil: 'domcontentloaded', timeout });
     
     // Capture data directly from browser context
@@ -78,8 +87,13 @@ export default async function handler(req, res) {
     });
 
     // Capture screenshot
-    const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 60, fullPage: false });
-    const screenshot = `data:image/jpeg;base64,${screenshotBuffer.toString('base64')}`;
+    let screenshot = '';
+    try {
+        const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 50, fullPage: false });
+        screenshot = `data:image/jpeg;base64,${screenshotBuffer.toString('base64')}`;
+    } catch (e) {
+        console.warn("Screenshot capture failed", e);
+    }
 
     // Process Tech Stack & Headers (Server-side)
     const headers = response.headers();
@@ -101,9 +115,7 @@ export default async function handler(req, res) {
     if (htmlLower.includes('bootstrap')) techStack.frontend.push('Bootstrap');
     if (htmlLower.includes('tailwind')) techStack.frontend.push('Tailwind CSS');
 
-    // Quick Security Checks
     const vulnerabilities = [];
-    
     if (!headers['strict-transport-security'] && formattedUrl.startsWith('https')) {
       vulnerabilities.push({
         name: 'Missing HSTS',
@@ -114,23 +126,13 @@ export default async function handler(req, res) {
       });
     }
 
-    if (headers['x-powered-by']) {
-      vulnerabilities.push({
-        name: 'Information Leakage',
-        severity: 'LOW',
-        description: `Server reveals technology via X-Powered-By: ${headers['x-powered-by']}`,
-        exploitScenario: 'Attackers can target specific exploits for known versions.',
-        remediation: 'Remove X-Powered-By headers.'
-      });
-    }
-
     await browser.close();
 
     res.status(200).json({
       success: true,
       data: {
         screenshot,
-        html: pageData.html.substring(0, 15000), // Increased limit for AI
+        html: pageData.html.substring(0, 15000),
         performance: pageData.performance,
         meta: {
           title: pageData.title,
@@ -150,11 +152,13 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    if (browser) await browser.close();
+    if (browser) {
+        try { await browser.close(); } catch(e) {}
+    }
     console.error("Puppeteer Error:", error);
     res.status(500).json({ 
       success: false, 
-      error: error.message || 'Unknown scan error',
+      error: error.message || 'Scan failed',
       details: error.toString()
     });
   }

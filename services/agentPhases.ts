@@ -1,6 +1,8 @@
+
 import { Business, ReconnaissancePlan, CollectedData } from '../types';
 import { callHybridAI } from './hybridAI';
-import { captureScreenshotAPI, captureScreenshotAPIFlash, captureScreenshotOne, fetchAndAnalyzeHTML } from './dataCollectionTools';
+import { captureScreenshotAPI, captureScreenshotAPIFlash, captureScreenshotOne } from './screenshotTools';
+import { fetchAndAnalyzeHTML } from './dataCollectionTools';
 import { cleanJSONResponse, sleep } from './autonomousAgent';
 
 // ==========================================

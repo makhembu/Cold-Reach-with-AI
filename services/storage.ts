@@ -30,27 +30,54 @@ const DEFAULT_PROFILE: UserProfile = {
   onboardingCompleted: false
 };
 
+// Compression helper for base64 images to save space
+const compressScreenshot = (base64: string): string => {
+  if (base64.length > 500000) { // If larger than ~500KB
+    // In a real scenario, we'd canvas resize here. 
+    // For now, we rely on the quota handler to strip it if needed.
+    return base64; 
+  }
+  return base64;
+};
+
 // Safe storage wrapper to handle quota limits
 const safeSetItem = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
+    // Notify app that save was successful (optional custom event)
+    window.dispatchEvent(new CustomEvent('coldreach-storage-saved'));
   } catch (e: any) {
     if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
       console.warn("LocalStorage Quota Exceeded. Attempting to cleanup...");
       
       if (key === KEYS.BUSINESSES) {
         try {
-          // Parse the businesses, strip screenshots/logs from older ones
           const businesses: Business[] = JSON.parse(value);
+          
+          // Strategy 1: Remove oldest analysis logs and chat history
           const slimBusinesses = businesses.map(b => ({
             ...b,
-            screenshot: undefined, // Drop screenshots to save space
-            logs: undefined,       // Drop logs
-            chatHistory: undefined // Drop chat history
+            logs: undefined,       
+            chatHistory: undefined 
           }));
-          localStorage.setItem(key, JSON.stringify(slimBusinesses));
-          alert("Storage full! Screenshots and logs were removed to save your data.");
-          return;
+          
+          try {
+             localStorage.setItem(key, JSON.stringify(slimBusinesses));
+             console.log("Recovered by stripping logs.");
+             return;
+          } catch(e2) {
+             // Strategy 2: Remove screenshots from all but the most recent 5
+             const sortedByDate = [...slimBusinesses].sort((a,b) => b.foundAt - a.foundAt);
+             const aggressiveSlim = sortedByDate.map((b, i) => ({
+                 ...b,
+                 screenshot: i < 5 ? b.screenshot : undefined,
+                 assets: { ...b.assets, mockupHtml: undefined } // Remove large HTML mockups
+             }));
+             localStorage.setItem(key, JSON.stringify(aggressiveSlim));
+             console.log("Recovered by stripping screenshots and mockups.");
+             alert("Storage full! Older screenshots were removed to make space.");
+             return;
+          }
         } catch (err) {
           console.error("Failed to recover from storage quota", err);
         }

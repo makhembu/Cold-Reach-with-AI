@@ -1,3 +1,4 @@
+
 import { Business, ReconnaissancePlan, CollectedData, ProfessionalAnalysis, OutreachStrategy, FullAnalysisResult } from '../types';
 
 // ==========================================
@@ -43,21 +44,30 @@ export async function analyzeAsAutonomousAgent(
   agentThoughts.push("Agent activated for: " + business.name);
   
   // Import functions from other modules
-  // Dynamic imports help avoid circular dependencies during initialization if any
   const { createReconnaissancePlan, executeReconnaissancePlan } = await import('./agentPhases');
   const { performDeepProfessionalAnalysis, determineOutreachStrategy } = await import('./agentAnalysis');
   
   // PHASE 1: AI RECONNAISSANCE PLANNING
   onLog("📋 Phase 1: Creating reconnaissance strategy...");
   
-  const reconPlan = await withTimeout(
-    createReconnaissancePlan(business, agentThoughts),
-    30000,
-    "Reconnaissance planning"
-  );
-  
-  onLog(`Strategy: ${reconPlan.strategy}`);
-  onLog(`Tools: ${reconPlan.tools_needed.map((t: any) => t.tool).join(', ')}`);
+  let reconPlan: ReconnaissancePlan;
+  try {
+    reconPlan = await withTimeout(
+      createReconnaissancePlan(business, agentThoughts),
+      30000,
+      "Reconnaissance planning"
+    );
+    onLog(`Strategy: ${reconPlan.strategy}`);
+  } catch (e: any) {
+    onLog(`⚠️ Planning failed: ${e.message}. Using default plan.`);
+    reconPlan = {
+      strategy: "Default scan due to planning failure",
+      reasoning: "Fallback",
+      tools_needed: [{ tool: "fetch_html", target: business.website, reason: "Backup", priority: 1 }],
+      focus_areas: ["basic_check"],
+      estimated_time: "30s"
+    };
+  }
   
   // PHASE 2: EXECUTE AI'S PLAN
   onLog("🔍 Phase 2: Executing reconnaissance...");
@@ -70,7 +80,18 @@ export async function analyzeAsAutonomousAgent(
   );
   
   const dataKeys = Object.keys(collectedData).filter(k => !collectedData[k].error);
-  onLog(`✓ Collected ${dataKeys.length} data sources`);
+  if (dataKeys.length === 0) {
+      onLog("⚠️ No valid data collected. Proceeding with limited inference.");
+      // Create a dummy data point so analysis doesn't crash
+      collectedData[business.website] = {
+          html: '',
+          error: 'All collection methods failed',
+          emails: [],
+          phoneNumbers: []
+      };
+  } else {
+      onLog(`✓ Collected ${dataKeys.length} data sources`);
+  }
   
   // PHASE 3: DEEP PROFESSIONAL ANALYSIS
   onLog("🔬 Phase 3: Deep analysis...");
