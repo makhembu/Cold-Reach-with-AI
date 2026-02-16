@@ -1,7 +1,7 @@
 
 import { Business, ReconnaissancePlan, CollectedData } from '../types';
 import { callHybridAI } from './hybridAI';
-import { captureScreenshotAPI, captureScreenshotAPIFlash, captureScreenshotOne } from './screenshotTools';
+import { captureBestScreenshot } from './screenshotTools';
 import { fetchAndAnalyzeHTML } from './dataCollectionTools';
 import { cleanJSONResponse, sleep } from './autonomousAgent';
 
@@ -23,10 +23,8 @@ TARGET:
 - Location: ${business.address || 'Unknown'}
 
 AVAILABLE TOOLS:
-1. screenshot_api(url) - ScreenshotAPI.net
-2. screenshot_apiflash(url) - ApiFlash
-3. screenshot_one(url) - ScreenshotOne (Best for ads/cookie blocking)
-4. fetch_html(url) - Get HTML, extract emails/phones/tech
+1. screenshot_tool(url) - Captures a visual snapshot of the site (auto-selects best service).
+2. fetch_html(url) - Get HTML, extract emails/phones/tech.
 
 TASK: Create reconnaissance plan.
 
@@ -44,7 +42,7 @@ Return ONLY valid JSON (no markdown):
   "reasoning": "Why this makes sense for THIS business",
   "tools_needed": [
     {
-      "tool": "screenshot_one",
+      "tool": "screenshot_tool",
       "target": "${business.website}",
       "reason": "Specific reason",
       "priority": 1
@@ -94,45 +92,27 @@ export async function executeReconnaissancePlan(
     
     try {
       let screenshot = null;
-      switch (tool.tool) {
-        case 'screenshot_one':
-          screenshot = await captureScreenshotOne(tool.target);
+      
+      // Normalize screenshot tools to the best available strategy
+      if (tool.tool.includes('screenshot')) {
+          screenshot = await captureBestScreenshot(tool.target);
           collectedData[tool.target] = {
             ...collectedData[tool.target],
             screenshot: screenshot,
-            method: 'screenshotone'
+            method: 'universal_screenshot'
           };
-          onLog(`    ✓ Screenshot captured (One)`);
-          break;
-
-        case 'screenshot_api':
-          screenshot = await captureScreenshotAPI(tool.target);
-          collectedData[tool.target] = {
-            ...collectedData[tool.target],
-            screenshot: screenshot,
-            method: 'screenshotapi'
-          };
-          onLog(`    ✓ Screenshot captured (API)`);
-          break;
-          
-        case 'screenshot_apiflash':
-          screenshot = await captureScreenshotAPIFlash(tool.target);
-          collectedData[tool.target] = {
-            ...collectedData[tool.target],
-            screenshot: screenshot,
-            method: 'apiflash'
-          };
-          onLog(`    ✓ Screenshot captured (Flash)`);
-          break;
-          
-        case 'fetch_html':
+          onLog(`    ✓ Screenshot captured`);
+      } 
+      else if (tool.tool === 'fetch_html') {
           const htmlData = await fetchAndAnalyzeHTML(tool.target);
           collectedData[tool.target] = {
             ...collectedData[tool.target],
             ...htmlData
           };
           onLog(`    ✓ HTML analyzed (${htmlData.emails?.length || 0} emails)`);
-          break;
+      }
+      else {
+         onLog(`    ? Unknown tool: ${tool.tool}`);
       }
       
       thoughts.push(`Success: ${tool.tool}`);

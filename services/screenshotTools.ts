@@ -1,7 +1,8 @@
+
 import { getSettings } from './storage';
 import { performSinglePassScan } from './api';
 
-// Optimized buffer to base64 conversion (prevents O(n²) string concatenation issues)
+// Optimized buffer to base64 conversion
 function bufferToBase64(buffer: ArrayBuffer): string {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -12,16 +13,9 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export async function captureScreenshotOne(url: string): Promise<string> {
-  const settings = getSettings();
-  const accessKey = settings.screenshotOneAccessKey;
+// --- Internal Service Implementations ---
 
-  if (!accessKey) {
-     const result = await performSinglePassScan(url);
-     if (result.success && result.data?.screenshot) return result.data.screenshot;
-     throw new Error('ScreenshotOne Access Key missing and fallback failed');
-  }
-
+async function tryScreenshotOne(url: string, key: string): Promise<string> {
   const params = new URLSearchParams({
     url: url,
     full_page: 'true',
@@ -31,38 +25,19 @@ export async function captureScreenshotOne(url: string): Promise<string> {
     block_ads: 'true',
     block_cookie_banners: 'true',
     block_trackers: 'true',
-    wait_for_selector: 'body'
+    wait_for_selector: 'body',
+    access_key: key
   });
 
-  const apiUrl = `https://api.screenshotone.com/take?${params.toString()}`;
-
-  const response = await fetch(apiUrl, {
-    method: 'GET',
-    headers: {
-      'X-Access-Key': accessKey
-    }
-  });
-
+  const response = await fetch(`https://api.screenshotone.com/take?${params.toString()}`);
   if (!response.ok) {
-    throw new Error(`ScreenshotOne failed: ${response.status} ${response.statusText}`);
+    throw new Error(`Status ${response.status} ${response.statusText}`);
   }
-
   const buffer = await response.arrayBuffer();
-  const base64 = bufferToBase64(buffer);
-
-  return `data:image/jpeg;base64,${base64}`;
+  return `data:image/jpeg;base64,${bufferToBase64(buffer)}`;
 }
 
-export async function captureScreenshotAPI(url: string): Promise<string> {
-  const settings = getSettings();
-  const token = settings.screenshotApiToken;
-  
-  if (!token) {
-    const result = await performSinglePassScan(url);
-    if (result.success && result.data?.screenshot) return result.data.screenshot;
-    throw new Error('ScreenshotAPI token missing and fallback failed');
-  }
-  
+async function tryScreenshotAPI(url: string, token: string): Promise<string> {
   const params = new URLSearchParams({
     token: token,
     url: url,
@@ -73,32 +48,17 @@ export async function captureScreenshotAPI(url: string): Promise<string> {
     delay: '2000'
   });
   
-  const apiUrl = `https://shot.screenshotapi.net/screenshot?${params.toString()}`;
-  
-  const response = await fetch(apiUrl);
-  
+  const response = await fetch(`https://shot.screenshotapi.net/screenshot?${params.toString()}`);
   if (!response.ok) {
-    throw new Error(`ScreenshotAPI failed: ${response.status} ${response.statusText}`);
+    throw new Error(`Status ${response.status} ${response.statusText}`);
   }
-  
   const buffer = await response.arrayBuffer();
-  const base64 = bufferToBase64(buffer);
-  
-  return `data:image/png;base64,${base64}`;
+  return `data:image/png;base64,${bufferToBase64(buffer)}`;
 }
 
-export async function captureScreenshotAPIFlash(url: string): Promise<string> {
-  const settings = getSettings();
-  const apiKey = settings.apiflashKey;
-  
-  if (!apiKey) {
-      const result = await performSinglePassScan(url);
-      if (result.success && result.data?.screenshot) return result.data.screenshot;
-      throw new Error('ApiFlash key missing and fallback failed');
-  }
-  
+async function tryApiFlash(url: string, key: string): Promise<string> {
   const params = new URLSearchParams({
-    access_key: apiKey,
+    access_key: key,
     url: url,
     full_page: 'true',
     fresh: 'true',
@@ -109,16 +69,84 @@ export async function captureScreenshotAPIFlash(url: string): Promise<string> {
     no_tracking: 'true'
   });
   
-  const apiUrl = `https://api.apiflash.com/v1/urltoimage?${params.toString()}`;
-  
-  const response = await fetch(apiUrl);
-  
+  const response = await fetch(`https://api.apiflash.com/v1/urltoimage?${params.toString()}`);
   if (!response.ok) {
-    throw new Error(`ApiFlash failed: ${response.status} ${response.statusText}`);
+    throw new Error(`Status ${response.status} ${response.statusText}`);
   }
-  
   const buffer = await response.arrayBuffer();
-  const base64 = bufferToBase64(buffer);
-  
-  return `data:image/jpeg;base64,${base64}`;
+  return `data:image/jpeg;base64,${bufferToBase64(buffer)}`;
+}
+
+// --- Exported Specific Wrappers (Legacy Support) ---
+
+export async function captureScreenshotOne(url: string): Promise<string> {
+  const settings = getSettings();
+  if (!settings.screenshotOneAccessKey) throw new Error('ScreenshotOne Access Key missing');
+  return tryScreenshotOne(url, settings.screenshotOneAccessKey);
+}
+
+export async function captureScreenshotAPI(url: string): Promise<string> {
+  const settings = getSettings();
+  if (!settings.screenshotApiToken) throw new Error('ScreenshotAPI token missing');
+  return tryScreenshotAPI(url, settings.screenshotApiToken);
+}
+
+export async function captureScreenshotAPIFlash(url: string): Promise<string> {
+  const settings = getSettings();
+  if (!settings.apiflashKey) throw new Error('ApiFlash key missing');
+  return tryApiFlash(url, settings.apiflashKey);
+}
+
+// --- The Master Strategy Function ---
+
+export async function captureBestScreenshot(url: string): Promise<string> {
+  const settings = getSettings();
+  const errors: string[] = [];
+
+  // Strategy 1: ApiFlash (Often most reliable for basic renders)
+  if (settings.apiflashKey) {
+    try {
+      return await tryApiFlash(url, settings.apiflashKey);
+    } catch (e: any) {
+      console.warn("ApiFlash failed, trying next strategy...", e);
+      errors.push(`ApiFlash: ${e.message}`);
+    }
+  }
+
+  // Strategy 2: ScreenshotAPI
+  if (settings.screenshotApiToken) {
+    try {
+      return await tryScreenshotAPI(url, settings.screenshotApiToken);
+    } catch (e: any) {
+      console.warn("ScreenshotAPI failed, trying next strategy...", e);
+      errors.push(`ScreenshotAPI: ${e.message}`);
+    }
+  }
+
+  // Strategy 3: ScreenshotOne
+  if (settings.screenshotOneAccessKey) {
+    try {
+      return await tryScreenshotOne(url, settings.screenshotOneAccessKey);
+    } catch (e: any) {
+      console.warn("ScreenshotOne failed, trying next strategy...", e);
+      errors.push(`ScreenshotOne: ${e.message}`);
+    }
+  }
+
+  // Strategy 4: Internal Puppeteer (API Route / Fallback)
+  // This runs on the server (if using Vercel) or locally
+  try {
+    const result = await performSinglePassScan(url);
+    if (result.success && result.data?.screenshot) {
+      return result.data.screenshot;
+    }
+    if (result.error) {
+      errors.push(`Internal Engine: ${result.error}`);
+    }
+  } catch (e: any) {
+    errors.push(`Internal Engine: ${e.message}`);
+  }
+
+  // If we get here, everything failed.
+  throw new Error(`All screenshot methods failed. Details: ${errors.join(' | ')}`);
 }

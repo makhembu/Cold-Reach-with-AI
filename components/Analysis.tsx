@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Bot, Brain, MessageSquare, RefreshCw, Terminal, AlertCircle, CheckCircle2, Activity, Database, Globe, Zap, Shield, TrendingUp, Clock, Cpu } from 'lucide-react';
+import { Play, Bot, Brain, MessageSquare, RefreshCw, Terminal, AlertCircle, CheckCircle2, Activity, Database, Globe, Zap, TrendingUp, Clock, Cpu, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
 import { analyzeAsAutonomousAgent } from '../services/autonomousAgent';
 import { chatWithAgent } from '../services/agentChat';
@@ -38,24 +39,45 @@ const ModelBadge = ({ model }: { model: string }) => {
   );
 };
 
-const TerminalLogs = ({ logs, modelUsed }: { logs: string[], modelUsed?: string }) => {
+const TerminalLogs = ({ logs, modelUsed, collapsed = false }: { logs: string[], modelUsed?: string, collapsed?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(!collapsed);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [logs]);
+
+  useEffect(() => { 
+    if (isOpen && ref.current) ref.current.scrollTop = ref.current.scrollHeight; 
+  }, [logs, isOpen]);
+
+  // If logs update and we are in "live" mode (not collapsed initially), auto scroll
+  useEffect(() => {
+     if(!collapsed && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  }, [logs, collapsed]);
+
+  if (logs.length === 0) return null;
+
   return (
-    <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-      <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+    <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden mb-4">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors"
+      >
         <div className="flex items-center gap-2">
           <Terminal size={12} className="text-green-400" />
-          <span className="text-xs font-mono text-slate-400">Agent Logs</span>
+          <span className="text-xs font-mono text-slate-400">System Logs ({logs.length})</span>
+          {isOpen ? <ChevronDown size={12} className="text-slate-500" /> : <ChevronRight size={12} className="text-slate-500" />}
         </div>
         {modelUsed && <ModelBadge model={modelUsed} />}
       </div>
-      <div ref={ref} className="p-3 h-48 overflow-y-auto font-mono text-xs text-green-400 space-y-0.5">
-        {logs.length === 0 ? <div className="text-slate-600 italic">Waiting...</div> : logs.map((log, i) => (
-          <div key={i}><span className="text-slate-600">›</span> {log}</div>
-        ))}
-        <div className="animate-pulse">▋</div>
-      </div>
+      
+      {isOpen && (
+        <div ref={ref} className="p-3 h-48 overflow-y-auto font-mono text-xs text-green-400 space-y-0.5 scrollbar-thin scrollbar-thumb-slate-700">
+          {logs.map((log, i) => (
+            <div key={i} className="break-all whitespace-pre-wrap border-l-2 border-slate-800 pl-2 mb-1">
+               <span className="opacity-50 select-none">›</span> {log}
+            </div>
+          ))}
+          <div className="animate-pulse">_</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -115,9 +137,9 @@ const AgentChat = ({ business, onUpdate }: { business: Business, onUpdate: () =>
       <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
         <MessageSquare size={14} className="text-blue-400" />
         <span className="text-xs font-bold text-slate-300">Chat with Agent</span>
-        <span className="ml-auto text-[10px] text-slate-500">Hybrid AI: Gemini + DeepSeek</span>
+        <span className="ml-auto text-[10px] text-slate-500">Hybrid AI</span>
       </div>
-      <div ref={ref} className="h-48 overflow-y-auto p-3 space-y-2">
+      <div ref={ref} className="h-48 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-slate-700">
         {messages.length === 0 && (
           <div className="text-center text-slate-500 text-xs py-4">
             <Bot size={24} className="mx-auto mb-2 opacity-30" />
@@ -157,7 +179,7 @@ const AgentChat = ({ business, onUpdate }: { business: Business, onUpdate: () =>
   );
 };
 
-const AnalysisDisplay = ({ analysis, screenshot }: { analysis: any, screenshot?: string }) => {
+const AnalysisDisplay = ({ analysis, business }: { analysis: any, business: Business }) => {
   if (!analysis.professionalAssessment) return null;
   const verdictColors: Record<string, string> = {
     'CRITICAL_REDESIGN_NEEDED': 'from-red-900/40 to-red-950/40 border-red-700/50',
@@ -165,16 +187,59 @@ const AnalysisDisplay = ({ analysis, screenshot }: { analysis: any, screenshot?:
     'MINOR_TWEAKS': 'from-yellow-900/40 to-yellow-950/40 border-yellow-700/50',
     'ACTUALLY_PRETTY_GOOD': 'from-green-900/40 to-green-950/40 border-green-700/50'
   };
+  
+  // Visual Fallback Logic
+  const visualContent = () => {
+    if (business.screenshot) {
+      return (
+        <img 
+          src={business.screenshot} 
+          alt="Site" 
+          className="w-32 h-20 object-cover rounded border border-white/20 hover:scale-150 transition-transform origin-top-right shadow-xl" 
+        />
+      );
+    }
+    
+    // Check for HTML as fallback
+    const hasHtml = Object.values(business.agentAnalysis?.collectedData || {}).some((d: any) => d.html && d.html.length > 500);
+    
+    if (hasHtml) {
+      const htmlData = Object.values(business.agentAnalysis?.collectedData || {}).find((d: any) => d.html)?.html;
+      return (
+        <div className="w-32 h-20 rounded border border-white/20 overflow-hidden bg-white relative group">
+          <div className="absolute inset-0 bg-transparent z-10 group-hover:hidden"></div>
+          <iframe 
+             srcDoc={htmlData} 
+             title="Preview"
+             className="w-[400%] h-[400%] transform scale-25 origin-top-left pointer-events-none"
+             sandbox=""
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] p-0.5 text-center font-bold">
+            Live HTML Preview
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-32 h-20 rounded border border-slate-700 bg-slate-900 flex flex-col items-center justify-center text-slate-500">
+        <Eye size={16} />
+        <span className="text-[10px] mt-1">No Visuals</span>
+      </div>
+    );
+  };
+
   const vc = verdictColors[analysis.verdict] || verdictColors.MINOR_TWEAKS;
+  
   return (
     <div className="space-y-3">
       <div className={`bg-gradient-to-br ${vc} rounded-lg border p-4`}>
         <div className="flex items-start justify-between mb-2">
-          <div>
+          <div className="flex-1 pr-4">
             <div className="text-4xl font-black text-slate-100">{analysis.overallScore}<span className="text-xl opacity-50">/100</span></div>
             <div className="text-xs opacity-80 uppercase tracking-wider font-bold text-slate-200 mt-1">{analysis.verdict?.replace(/_/g, ' ')}</div>
           </div>
-          {screenshot && <img src={screenshot} alt="Site" className="w-24 h-16 object-cover rounded border border-white/20" />}
+          {visualContent()}
         </div>
         <p className="text-xs text-slate-200 opacity-90">{analysis.professionalAssessment.what_i_see}</p>
       </div>
@@ -213,7 +278,7 @@ export const Analysis: React.FC = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('idle');
-  const [logs, setLogs] = useState<string[]>([]);
+  const [liveLogs, setLiveLogs] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
   const [usage, setUsage] = useState({ 
     gemini: { used: 0, limit: 1500, remaining: 1500 }, 
@@ -228,14 +293,14 @@ export const Analysis: React.FC = () => {
   
   const analyze = async (business: Business) => {
     setAnalyzingId(business.id);
-    setLogs([]);
+    setLiveLogs([]);
     setStatus('thinking');
     const logHistory: string[] = [];
     
     const log = (msg: string) => {
       const full = `[${new Date().toLocaleTimeString()}] ${msg}`;
       logHistory.push(full);
-      setLogs(p => [...p, full]);
+      setLiveLogs(p => [...p, full]);
       if (msg.includes('Phase 3')) setStatus('analyzing');
     };
     
@@ -251,9 +316,8 @@ export const Analysis: React.FC = () => {
         verdict: result.analysis.verdict,
         recommendedStrategy: result.analysis.recommended_strategy,
         pitchAngle: result.analysis.pitch_angle,
-        // Legacy fields for compatibility
         strategy: {
-            focus: 'DESIGN', // Inferred default
+            focus: 'DESIGN',
             suggestedPrice: result.analysis.recommended_strategy.estimated_investment,
             rationale: result.strategy.reasoning,
             roadmap: result.analysis.recommended_strategy.approach.split('_'),
@@ -271,15 +335,15 @@ export const Analysis: React.FC = () => {
         analysis: analysisResult,
         screenshot,
         email,
-        logs: logHistory,
-        agentAnalysis: result as any // Store full result
+        logs: logHistory, // Persist logs here
+        agentAnalysis: result as any
       });
       setStatus('complete');
     } catch (e: any) {
       log(`❌ FAILED: ${e.message}`);
       updateBusiness(business.id, { 
-        status: BusinessStatus.DISCOVERED, // Reset to discovered on failure so we can try again
-        logs: logHistory
+        status: BusinessStatus.DISCOVERED,
+        logs: logHistory 
       });
       setStatus('error');
     } finally {
@@ -342,15 +406,20 @@ export const Analysis: React.FC = () => {
                 )}
               </div>
               
-              {analyzingId === business.id && (
-                <div className="p-4">
-                  <TerminalLogs logs={logs} modelUsed={currentModel} />
-                </div>
-              )}
+              {/* Logs Section */}
+              <div className="px-4 pt-2">
+                {(analyzingId === business.id || (business.logs && business.logs.length > 0)) && (
+                   <TerminalLogs 
+                      logs={analyzingId === business.id ? liveLogs : (business.logs || [])} 
+                      modelUsed={analyzingId === business.id ? currentModel : undefined}
+                      collapsed={analyzingId !== business.id} // Collapse by default if not running
+                   />
+                )}
+              </div>
               
               {business.analysis && analyzingId !== business.id && (
-                <div className="p-4 space-y-4">
-                  <AnalysisDisplay analysis={business.analysis} screenshot={business.screenshot} />
+                <div className="p-4 pt-0 space-y-4">
+                  <AnalysisDisplay analysis={business.analysis} business={business} />
                   <AgentChat business={business} onUpdate={() => setBusinesses(getBusinesses())} />
                 </div>
               )}
