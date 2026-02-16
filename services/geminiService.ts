@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 import { load } from 'cheerio';
 import { getSettings } from './storage';
@@ -27,7 +28,25 @@ export const generateProfileFromInput = async (input: string): Promise<Partial<U
 
 export const getDiscoverySuggestions = async (profile: UserProfile): Promise<string[]> => {
   const ai = getAI();
-  const prompt = `Based on: ${profile.businessName} (${profile.bio}), suggest 5 Google Maps queries for finding clients with bad sites. JSON: { "queries": string[] }`;
+  const prompt = `
+    Act as a Growth Strategist for the agency "${profile.businessName || 'Creative Digital'}".
+    
+    AGENCY CONTEXT:
+    Bio/Skills: "${profile.bio || 'Web Design & Automation'}"
+    Additional Context: "${profile.portfolioText || ''}"
+    
+    OBJECTIVE:
+    Generate 6 targeted Google Maps search queries to find local businesses that likely need this agency's specific services.
+    
+    CRITERIA:
+    1. Focus on high-ticket niches (Law, Medical, Construction) if not specified otherwise.
+    2. Suggest queries that might reveal outdated businesses (e.g., "Oldest [niche] in [city]").
+    3. If the bio mentions a location, use it. Otherwise use major cities or general terms.
+    4. Vary the intent (e.g., "Best rated..." vs "Low rated...").
+    
+    Output JSON: { "queries": ["string"] }
+  `;
+
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: prompt,

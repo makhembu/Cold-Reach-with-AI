@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Save, Key, Mail, User, CheckCircle2, Shield, Globe, Database, Download, Upload, Trash2, AlertCircle } from 'lucide-react';
 import { getSettings, saveSettings, getUserProfile, saveUserProfile, getBusinesses } from '../services/storage';
@@ -121,64 +122,25 @@ export const SettingsPage: React.FC = () => {
 
             <div className="border-t border-slate-200 pt-6">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <Globe size={16} /> Advanced Agents (DeepSeek R1)
+                <Globe size={16} /> Advanced Agents (DeepSeek R1 via OpenRouter)
               </h3>
               
-              <div className="space-y-6">
-                 {/* Option A: GCP */}
-                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                   <h4 className="text-sm font-bold text-slate-700 mb-3">Option A: Google Cloud Vertex AI (Preferred)</h4>
-                   <div className="space-y-4">
-                     <div>
-                       <label className="block text-xs font-medium text-slate-600 mb-1">GCP Project ID</label>
-                       <input
-                         className="w-full px-3 py-2 border border-slate-300 rounded-md outline-none text-sm"
-                         value={settings.gcpProjectId || ''}
-                         onChange={e => setSettings({...settings, gcpProjectId: e.target.value})}
-                         placeholder="my-project-123"
-                       />
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
-                         <select
-                           className="w-full px-3 py-2 border border-slate-300 rounded-md outline-none bg-white text-sm"
-                           value={settings.gcpLocation || 'us-central1'}
-                           onChange={e => setSettings({...settings, gcpLocation: e.target.value})}
-                         >
-                           <option value="us-central1">us-central1</option>
-                           <option value="global">global</option>
-                         </select>
-                       </div>
-                       <div>
-                         <label className="block text-xs font-medium text-slate-600 mb-1">Access Token</label>
-                         <input
-                           type="password"
-                           className="w-full px-3 py-2 border border-slate-300 rounded-md outline-none text-sm"
-                           value={settings.gcpAccessToken || ''}
-                           onChange={e => setSettings({...settings, gcpAccessToken: e.target.value})}
-                           placeholder="ya29..."
-                         />
-                       </div>
-                     </div>
-                     <p className="text-[10px] text-slate-500">Run <code>gcloud auth print-access-token</code> to get a temporary token.</p>
-                   </div>
-                 </div>
-
-                 {/* Option B: OpenRouter */}
-                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                   <h4 className="text-sm font-bold text-slate-700 mb-3">Option B: OpenRouter (Alternative)</h4>
-                   <div>
-                     <label className="block text-xs font-medium text-slate-600 mb-1">OpenRouter API Key</label>
-                     <input
-                       type="password"
-                       className="w-full px-3 py-2 border border-slate-300 rounded-md outline-none text-sm"
-                       value={settings.openRouterApiKey || ''}
-                       onChange={e => setSettings({...settings, openRouterApiKey: e.target.value})}
-                       placeholder="sk-or-..."
-                     />
-                     <p className="text-[10px] text-slate-500 mt-1">Limited to 50 requests/day if used as fallback.</p>
-                   </div>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">OpenRouter API Key</label>
+                   <input
+                     type="password"
+                     className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
+                     value={settings.openRouterApiKey || ''}
+                     onChange={e => setSettings({...settings, openRouterApiKey: e.target.value})}
+                     placeholder="sk-or-..."
+                   />
+                   <p className="text-[10px] text-slate-500 mt-2">
+                     Required for advanced reasoning capabilities (DeepSeek R1). 
+                     <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline ml-1">
+                       Get a key
+                     </a>
+                   </p>
                  </div>
               </div>
             </div>

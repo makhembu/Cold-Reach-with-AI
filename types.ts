@@ -43,7 +43,7 @@ export interface TechStack {
   analytics?: string[];
   hosting?: string[];
   server?: string;
-  detectedVersions?: Record<string, string>; // e.g. { "WordPress": "5.2" }
+  detectedVersions?: Record<string, string>;
 }
 
 export interface NavigationStep {
@@ -58,7 +58,7 @@ export interface SecurityVulnerability {
   name: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   description: string;
-  exploitScenario: string; // "A bad actor could..."
+  exploitScenario: string;
   remediation: string;
 }
 
@@ -82,7 +82,7 @@ export interface LighthouseData {
   seo: number;
   pwa?: number;
   screenshot?: string;
-  failedAudits?: string[]; // List of key failed audit titles
+  failedAudits?: string[];
 }
 
 export interface StrategicAnalysis {
@@ -273,7 +273,7 @@ export interface Business {
   
   // New Agent Fields
   agentResult?: FullAnalysisResult;
-  agentAnalysis?: FullAnalysisResult; // To support both naming conventions if needed
+  agentAnalysis?: FullAnalysisResult;
   
   outreach?: {
     lastContactedAt?: number;
@@ -286,12 +286,13 @@ export interface Settings {
   geminiApiKey: string;
   outscraperApiKey?: string;
   
-  // New API Keys
+  // Advanced Agent API Keys
   deepseekApiKey?: string;
+  openRouterApiKey?: string; 
   gcpProjectId?: string;
   gcpLocation?: string;
   gcpAccessToken?: string;
-  
+
   screenshotApiToken?: string;
   apiflashKey?: string;
   screenshotOneAccessKey?: string;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, MapPin, Loader2, Sparkles, AlertCircle, ArrowRight, Globe, Database, RefreshCw } from 'lucide-react';
 import { addBusiness, getUserProfile, getSettings } from '../services/storage';
@@ -17,7 +18,11 @@ export const Discovery: React.FC = () => {
     // Try load from cache first
     const cached = localStorage.getItem('coldreach_suggestions');
     if (cached) {
-      setSuggestions(JSON.parse(cached));
+      try {
+        setSuggestions(JSON.parse(cached));
+      } catch (e) {
+        // invalid cache
+      }
     } else {
       loadSuggestions();
     }

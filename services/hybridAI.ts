@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 
 function getAPIKeys() {
@@ -8,6 +9,7 @@ function getAPIKeys() {
   
   return {
     geminiKey: parsed.geminiApiKey,
+    openRouterKey: parsed.openRouterApiKey || '',
     gcpProjectId: parsed.gcpProjectId || '',
     gcpLocation: parsed.gcpLocation || 'us-central1',
     gcpAccessToken: parsed.gcpAccessToken || ''
@@ -18,17 +20,24 @@ interface Usage {
   date: string;
   gemini: number;
   deepseek: number;
+  openrouter: number;
 }
 
 function getUsageToday(): Usage {
   const today = new Date().toDateString();
   const stored = localStorage.getItem('apiUsage');
-  if (!stored) return { date: today, gemini: 0, deepseek: 0 };
+  
+  const defaultUsage = { date: today, gemini: 0, deepseek: 0, openrouter: 0 };
+  
+  if (!stored) return defaultUsage;
+  
   const usage: Usage = JSON.parse(stored);
-  return usage.date === today ? usage : { date: today, gemini: 0, deepseek: 0 };
+  if (usage.date !== today) return defaultUsage;
+  
+  return { ...defaultUsage, ...usage };
 }
 
-function incrementUsage(model: 'gemini' | 'deepseek'): void {
+function incrementUsage(model: 'gemini' | 'deepseek' | 'openrouter'): void {
   const usage = getUsageToday();
   usage[model]++;
   localStorage.setItem('apiUsage', JSON.stringify(usage));
@@ -38,7 +47,8 @@ export function getAPIUsageStatus() {
   const usage = getUsageToday();
   return {
     gemini: { used: usage.gemini, limit: 1500, remaining: 1500 - usage.gemini },
-    deepseek: { used: usage.deepseek, limit: 999999, remaining: 999999 }
+    deepseek: { used: usage.deepseek, limit: 999999, remaining: 999999 },
+    openrouter: { used: usage.openrouter, limit: 50, remaining: 50 }
   };
 }
 
@@ -108,12 +118,39 @@ export async function callGeminiPro(prompt: string): Promise<string> {
 }
 
 export async function callDeepSeekReasoner(prompt: string): Promise<string> {
-  const { gcpProjectId, gcpLocation, gcpAccessToken } = getAPIKeys();
+  const { openRouterKey, gcpProjectId, gcpAccessToken, gcpLocation } = getAPIKeys();
+
+  // Try OpenRouter first (Easiest for user)
+  if (openRouterKey) {
+      try {
+          const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openRouterKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": window.location.href,
+              "X-Title": "ColdReach AI",
+            },
+            body: JSON.stringify({
+              "model": "deepseek/deepseek-r1",
+              "messages": [{ "role": "user", "content": prompt }]
+            })
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              incrementUsage('openrouter');
+              return data.choices?.[0]?.message?.content || "";
+          }
+      } catch (e) {
+          console.warn("OpenRouter error", e);
+      }
+  }
   
+  // Try GCP Vertex AI (DeepSeek R1 Distill)
   if (gcpProjectId && gcpAccessToken) {
-    const endpoint = `https://${gcpLocation}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpLocation}/publishers/deepseek/models/deepseek-r1:generateContent`;
-    
     try {
+      const endpoint = `https://${gcpLocation}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpLocation}/publishers/deepseek/models/deepseek-r1:generateContent`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -121,29 +158,22 @@ export async function callDeepSeekReasoner(prompt: string): Promise<string> {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.6,
-            maxOutputTokens: 8192
-          }
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.6, maxOutputTokens: 8192 }
         })
       });
-      
-      if (!response.ok) {
-        console.warn(`DeepSeek Vertex AI failed: ${response.status}. Fallback to Gemini.`);
-      } else {
-        const data = await response.json();
-        incrementUsage('deepseek');
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+      if (response.ok) {
+         const data = await response.json();
+         incrementUsage('deepseek');
+         return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
     } catch (e) {
-      console.warn("DeepSeek error", e);
+      console.warn("DeepSeek GCP error", e);
     }
   }
   
+  // Fallback to Gemini
   return callGeminiFast(prompt);
 }
 

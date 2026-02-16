@@ -1,3 +1,4 @@
+
 import { Business, ReconnaissancePlan, CollectedData, ProfessionalAnalysis, OutreachStrategy, FullAnalysisResult } from '../types';
 
 async function withTimeout<T>(

@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   geminiApiKey: '',
   outscraperApiKey: '',
   deepseekApiKey: '',
+  openRouterApiKey: '',
   screenshotApiToken: '',
   apiflashKey: '',
   screenshotOneAccessKey: '',
@@ -36,8 +37,6 @@ const safeSetItem = (key: string, value: string) => {
   } catch (e: any) {
     if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
       console.warn("LocalStorage Quota Exceeded. Attempting to cleanup...");
-      // Try to clean up businesses that are just discovered but old? 
-      // Or just warn user. For now, we'll try to strip heavy logs/screenshots from the payload being saved.
       
       if (key === KEYS.BUSINESSES) {
         try {

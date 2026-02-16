@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from '@google/genai';
 
 function getAPIKeys() {
@@ -9,9 +8,6 @@ function getAPIKeys() {
   
   return {
     geminiKey: parsed.geminiApiKey,
-    gcpProjectId: parsed.gcpProjectId || '',
-    gcpLocation: parsed.gcpLocation || 'us-central1',
-    gcpAccessToken: parsed.gcpAccessToken || '',
     openRouterKey: parsed.openRouterApiKey || ''
   };
 }
@@ -48,7 +44,7 @@ export function getAPIUsageStatus() {
   return {
     gemini: { used: usage.gemini, limit: 1500, remaining: 1500 - usage.gemini },
     deepseek: { used: usage.deepseek, limit: 999999, remaining: 999999 },
-    openrouter: { used: usage.openrouter, limit: 50, remaining: 50 - usage.openrouter }
+    openrouter: { used: usage.openrouter, limit: 50, remaining: 50 }
   };
 }
 
@@ -118,76 +114,36 @@ export async function callGeminiPro(prompt: string): Promise<string> {
 }
 
 export async function callDeepSeekReasoner(prompt: string): Promise<string> {
-  const { gcpProjectId, gcpLocation, gcpAccessToken, openRouterKey } = getAPIKeys();
-  
-  // 1. Try GCP Vertex AI (Preferred)
-  if (gcpProjectId && gcpAccessToken) {
-    const endpoint = `https://${gcpLocation}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpLocation}/publishers/deepseek/models/deepseek-r1:generateContent`;
-    
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${gcpAccessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.6,
-            maxOutputTokens: 8192
-          }
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        incrementUsage('deepseek');
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
-        console.warn(`DeepSeek Vertex AI failed: ${response.status}. Trying alternatives.`);
-      }
-    } catch (e) {
-      console.warn("DeepSeek GCP error", e);
-    }
-  }
+  const { openRouterKey } = getAPIKeys();
 
-  // 2. Try OpenRouter (Secondary)
+  // Try OpenRouter first
   if (openRouterKey) {
-     const usage = getUsageToday();
-     if (usage.openrouter < 50) {
-        try {
-           const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${openRouterKey}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                "model": "deepseek/deepseek-r1",
-                "messages": [{ "role": "user", "content": prompt }]
-              })
-            });
+      try {
+          const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openRouterKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": window.location.href,
+              "X-Title": "ColdReach AI",
+            },
+            body: JSON.stringify({
+              "model": "deepseek/deepseek-r1",
+              "messages": [{ "role": "user", "content": prompt }]
+            })
+          });
 
-            if (response.ok) {
-                const data = await response.json();
-                incrementUsage('openrouter');
-                return data.choices?.[0]?.message?.content || "";
-            } else {
-                console.warn("OpenRouter failed:", response.status);
-            }
-        } catch (e) {
-            console.warn("OpenRouter error", e);
-        }
-     } else {
-         console.warn("OpenRouter daily limit reached (50).");
-     }
+          if (response.ok) {
+              const data = await response.json();
+              incrementUsage('openrouter');
+              return data.choices?.[0]?.message?.content || "";
+          }
+      } catch (e) {
+          console.warn("OpenRouter error", e);
+      }
   }
   
-  // 3. Fallback to Gemini
+  // Fallback to Gemini
   return callGeminiFast(prompt);
 }
 
@@ -207,8 +163,6 @@ export async function callHybridAI(config: {
     
     if (taskType === 'planning' || taskType === 'strategy') {
       const response = await callDeepSeekReasoner(prompt);
-      // Check which service was actually used based on usage increment could be complex here without refactoring
-      // but conceptually it's "Reasoning Model"
       return { response, modelUsed: 'deepseek-r1 (reasoning)' };
     }
     

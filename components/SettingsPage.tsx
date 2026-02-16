@@ -121,47 +121,26 @@ export const SettingsPage: React.FC = () => {
 
             <div className="border-t border-slate-200 pt-6">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <Globe size={16} /> Advanced Agents (DeepSeek)
+                <Globe size={16} /> Advanced Agents (DeepSeek R1 via OpenRouter)
               </h3>
               
-              <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                  <div>
-                   <label className="block text-sm font-medium text-slate-700 mb-1">GCP Project ID (for Vertex AI)</label>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">OpenRouter API Key</label>
                    <input
-                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                     value={settings.gcpProjectId || ''}
-                     onChange={e => setSettings({...settings, gcpProjectId: e.target.value})}
-                     placeholder="my-project-123"
+                     type="password"
+                     className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
+                     value={settings.openRouterApiKey || ''}
+                     onChange={e => setSettings({...settings, openRouterApiKey: e.target.value})}
+                     placeholder="sk-or-..."
                    />
+                   <p className="text-[10px] text-slate-500 mt-2">
+                     Required for advanced reasoning capabilities (DeepSeek R1). 
+                     <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline ml-1">
+                       Get a key
+                     </a>
+                   </p>
                  </div>
-                 
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">GCP Location</label>
-                     <select
-                       className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-white"
-                       value={settings.gcpLocation || 'us-central1'}
-                       onChange={e => setSettings({...settings, gcpLocation: e.target.value})}
-                     >
-                       <option value="us-central1">us-central1</option>
-                       <option value="global">global</option>
-                     </select>
-                   </div>
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">GCP Access Token</label>
-                     <input
-                       type="password"
-                       className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
-                       value={settings.gcpAccessToken || ''}
-                       onChange={e => setSettings({...settings, gcpAccessToken: e.target.value})}
-                       placeholder="ya29..."
-                     />
-                   </div>
-                 </div>
-                 <p className="text-xs text-slate-500">
-                    DeepSeek reasoning models are accessed via Google Vertex AI. 
-                    Run <code>gcloud auth print-access-token</code> to get a token.
-                 </p>
               </div>
             </div>
 

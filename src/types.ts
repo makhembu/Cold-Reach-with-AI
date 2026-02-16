@@ -1,4 +1,5 @@
 
+
 export enum BusinessStatus {
   DISCOVERED = 'DISCOVERED',
   ANALYZED = 'ANALYZED',
@@ -286,13 +287,9 @@ export interface Settings {
   geminiApiKey: string;
   outscraperApiKey?: string;
   
-  // New API Keys
+  // Advanced Agent API Keys
   deepseekApiKey?: string;
-  gcpProjectId?: string;
-  gcpLocation?: string;
-  gcpAccessToken?: string;
-  
-  openRouterApiKey?: string; // Add OpenRouter key support
+  openRouterApiKey?: string; 
 
   screenshotApiToken?: string;
   apiflashKey?: string;

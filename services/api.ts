@@ -1,3 +1,4 @@
+
 import { Business, BusinessStatus, EmailConfig } from '../types';
 import { getSettings } from './storage';
 import axios from 'axios';
@@ -85,8 +86,7 @@ export const performFullAudit = async (url: string) => {
       techStack: result.data.techStack,
       vulnerabilities: result.data.vulnerabilities,
       rawHtml: result.data.html,
-      loadTime: result.data.performance.loadTime,
-      securityHeaders: result.data.headers
+      loadTime: result.data.performance.loadTime
     };
   }
   return { status: 'error', reason: result.error };

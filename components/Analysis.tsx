@@ -216,7 +216,11 @@ export const Analysis: React.FC = () => {
   const [status, setStatus] = useState<string>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
-  const [usage, setUsage] = useState({ gemini: { used: 0, limit: 1500, remaining: 1500 }, deepseek: { used: 0, limit: 999999, remaining: 999999 } });
+  const [usage, setUsage] = useState({ 
+    gemini: { used: 0, limit: 1500, remaining: 1500 }, 
+    deepseek: { used: 0, limit: 999999, remaining: 999999 },
+    openrouter: { used: 0, limit: 50, remaining: 50 }
+  });
   
   useEffect(() => { 
     setBusinesses(getBusinesses()); 
@@ -299,7 +303,10 @@ export const Analysis: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="text-right text-[10px]">
               <div className="text-blue-400 font-bold">Gemini: {usage.gemini.used} used</div>
-              <div className="text-purple-400 font-bold">DeepSeek: {usage.deepseek.used} used</div>
+              <div className="text-purple-400 font-bold">DeepSeek (GCP): {usage.deepseek.used} used</div>
+              {usage.openrouter.used > 0 && (
+                <div className="text-orange-400 font-bold">DeepSeek (OpenRouter): {usage.openrouter.used}/50</div>
+              )}
             </div>
             <AgentStatus status={status} />
           </div>
