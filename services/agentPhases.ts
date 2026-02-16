@@ -1,6 +1,7 @@
+
 import { Business, ReconnaissancePlan, CollectedData } from '../types';
 import { callHybridAI } from './hybridAI';
-import { captureScreenshotAPI, captureScreenshotAPIFlash, fetchAndAnalyzeHTML } from './dataCollectionTools';
+import { captureScreenshotAPI, captureScreenshotAPIFlash, captureScreenshotOne, fetchAndAnalyzeHTML } from './dataCollectionTools';
 import { cleanJSONResponse, sleep } from './autonomousAgent';
 
 export async function createReconnaissancePlan(
@@ -19,7 +20,8 @@ TARGET:
 AVAILABLE TOOLS:
 1. screenshot_api(url) - ScreenshotAPI.net
 2. screenshot_apiflash(url) - ApiFlash
-3. fetch_html(url) - Get HTML, extract emails/phones/tech
+3. screenshot_one(url) - ScreenshotOne (Best for ads/cookie blocking)
+4. fetch_html(url) - Get HTML, extract emails/phones/tech
 
 TASK: Create reconnaissance plan.
 
@@ -37,7 +39,7 @@ Return ONLY valid JSON (no markdown):
   "reasoning": "Why this makes sense for THIS business",
   "tools_needed": [
     {
-      "tool": "screenshot_api",
+      "tool": "screenshot_one",
       "target": "${business.website}",
       "reason": "Specific reason",
       "priority": 1
@@ -82,22 +84,33 @@ export async function executeReconnaissancePlan(
     thoughts.push(`Executing: ${tool.tool}`);
     
     try {
+      let screenshot = null;
       switch (tool.tool) {
-        case 'screenshot_api':
-          const screenshot1 = await captureScreenshotAPI(tool.target);
+        case 'screenshot_one':
+          screenshot = await captureScreenshotOne(tool.target);
           collectedData[tool.target] = {
             ...collectedData[tool.target],
-            screenshot: screenshot1,
+            screenshot: screenshot,
+            method: 'screenshotone'
+          };
+          onLog(`    ✓ Screenshot captured (One)`);
+          break;
+
+        case 'screenshot_api':
+          screenshot = await captureScreenshotAPI(tool.target);
+          collectedData[tool.target] = {
+            ...collectedData[tool.target],
+            screenshot: screenshot,
             method: 'screenshotapi'
           };
           onLog(`    ✓ Screenshot captured (API)`);
           break;
           
         case 'screenshot_apiflash':
-          const screenshot2 = await captureScreenshotAPIFlash(tool.target);
+          screenshot = await captureScreenshotAPIFlash(tool.target);
           collectedData[tool.target] = {
             ...collectedData[tool.target],
-            screenshot: screenshot2,
+            screenshot: screenshot,
             method: 'apiflash'
           };
           onLog(`    ✓ Screenshot captured (Flash)`);

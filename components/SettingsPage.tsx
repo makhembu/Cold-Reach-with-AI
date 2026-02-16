@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Save, Key, Mail, User, CheckCircle2, Shield, Globe, Database, Download, Upload, Trash2, AlertCircle } from 'lucide-react';
 import { getSettings, saveSettings, getUserProfile, saveUserProfile, getBusinesses } from '../services/storage';
@@ -61,10 +62,10 @@ export const SettingsPage: React.FC = () => {
     <button
       type="button"
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
         activeTab === id 
-          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' 
-          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 border border-transparent'
+          ? 'bg-brand-100 text-brand-700' 
+          : 'text-slate-600 hover:bg-slate-100'
       }`}
     >
       <Icon size={16} />
@@ -73,75 +74,72 @@ export const SettingsPage: React.FC = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex justify-between items-end pb-6 border-b border-slate-800">
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-black text-white">System Configuration</h2>
-          <p className="text-slate-400 mt-1">Manage API keys, agents, and user profile</p>
+          <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
+          <p className="text-slate-500 mt-1">Manage your configuration and profile</p>
         </div>
         <button
           onClick={handleSave}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-lg shadow-blue-900/20"
+          className="bg-brand-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-brand-700 transition-colors flex items-center gap-2"
         >
           {saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
-          {saved ? 'Settings Saved' : 'Save Changes'}
+          {saved ? 'Saved!' : 'Save Changes'}
         </button>
       </div>
 
-      <div className="flex gap-2 pb-2 overflow-x-auto">
-        <TabButton id="api" label="API Keys & Agents" icon={Key} />
+      <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <TabButton id="api" label="API Keys" icon={Key} />
         <TabButton id="email" label="Email Config" icon={Mail} />
         <TabButton id="profile" label="User Profile" icon={User} />
-        <TabButton id="data" label="Data & Backup" icon={Database} />
+        <TabButton id="data" label="Data Management" icon={Database} />
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <form onSubmit={handleSave} className="space-y-6">
         
         {/* API Tab */}
         {activeTab === 'api' && (
-          <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 space-y-8 shadow-xl">
-            <div className="flex items-start gap-4 p-4 bg-blue-950/30 border border-blue-900 rounded-lg">
-              <Shield className="text-blue-400 shrink-0 mt-0.5" size={20} />
-              <div>
-                <p className="text-sm font-bold text-blue-300 mb-1">Core Requirement</p>
-                <p className="text-xs text-blue-400/80">
-                  This system runs on <strong>Google Gemini</strong>. A valid API key is mandatory for all functions.
-                </p>
-              </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <Shield className="text-blue-600 shrink-0 mt-0.5" size={20} />
+              <p className="text-sm text-blue-800">
+                <strong>Gemini API Key Required:</strong> This app uses Google's Gemini AI for core functions.
+              </p>
             </div>
             
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Gemini API Key</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key</label>
               <input
                 type="password"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg focus:border-blue-500 outline-none text-slate-200 font-mono text-sm"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
                 value={settings.geminiApiKey}
                 onChange={e => setSettings({...settings, geminiApiKey: e.target.value})}
                 placeholder="AIza..."
               />
             </div>
 
-            <div className="border-t border-slate-800 pt-8">
-              <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2">
-                <Globe size={18} className="text-purple-400" /> Advanced Reasoning Agents (DeepSeek)
+            <div className="border-t border-slate-200 pt-6">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Globe size={16} /> Advanced Agents (DeepSeek)
               </h3>
               
-              <div className="space-y-6">
+              <div className="space-y-4">
                  <div>
-                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">GCP Project ID</label>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">GCP Project ID (for Vertex AI)</label>
                    <input
-                     className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg focus:border-purple-500 outline-none text-slate-200 font-mono text-sm"
+                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
                      value={settings.gcpProjectId || ''}
                      onChange={e => setSettings({...settings, gcpProjectId: e.target.value})}
                      placeholder="my-project-123"
                    />
                  </div>
                  
-                 <div className="grid grid-cols-2 gap-6">
+                 <div className="grid grid-cols-2 gap-4">
                    <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">GCP Location</label>
+                     <label className="block text-sm font-medium text-slate-700 mb-1">GCP Location</label>
                      <select
-                       className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 text-sm"
+                       className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-white"
                        value={settings.gcpLocation || 'us-central1'}
                        onChange={e => setSettings({...settings, gcpLocation: e.target.value})}
                      >
@@ -150,44 +148,59 @@ export const SettingsPage: React.FC = () => {
                      </select>
                    </div>
                    <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">GCP Access Token</label>
+                     <label className="block text-sm font-medium text-slate-700 mb-1">GCP Access Token</label>
                      <input
                        type="password"
-                       className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 font-mono text-sm"
+                       className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                        value={settings.gcpAccessToken || ''}
                        onChange={e => setSettings({...settings, gcpAccessToken: e.target.value})}
                        placeholder="ya29..."
                      />
                    </div>
                  </div>
-                 <p className="text-xs text-slate-500 font-mono bg-slate-950 p-2 rounded border border-slate-800">
-                    $ gcloud auth print-access-token
+                 <p className="text-xs text-slate-500">
+                    DeepSeek reasoning models are accessed via Google Vertex AI. 
+                    Run <code>gcloud auth print-access-token</code> to get a token.
                  </p>
               </div>
             </div>
 
-            <div className="border-t border-slate-800 pt-8">
-               <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2">
-                 <Globe size={18} className="text-green-400" /> Screenshot Services (Optional)
+            <div className="border-t border-slate-200 pt-6">
+               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                 <Globe size={16} /> Screenshot Services (Optional)
                </h3>
-               <div className="grid grid-cols-2 gap-6">
+               <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ScreenshotAPI Token</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">ScreenshotOne Access Key</label>
                     <input
                       type="password"
-                      className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 font-mono text-sm"
-                      value={settings.screenshotApiToken || ''}
-                      onChange={e => setSettings({...settings, screenshotApiToken: e.target.value})}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
+                      value={settings.screenshotOneAccessKey || ''}
+                      onChange={e => setSettings({...settings, screenshotOneAccessKey: e.target.value})}
+                      placeholder="ScreenshotOne Access Key"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ApiFlash Key</label>
-                    <input
-                      type="password"
-                      className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 font-mono text-sm"
-                      value={settings.apiflashKey || ''}
-                      onChange={e => setSettings({...settings, apiflashKey: e.target.value})}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">ScreenshotAPI Token</label>
+                      <input
+                        type="password"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
+                        value={settings.screenshotApiToken || ''}
+                        onChange={e => setSettings({...settings, screenshotApiToken: e.target.value})}
+                        placeholder="ScreenshotAPI Token"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">ApiFlash Key</label>
+                      <input
+                        type="password"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
+                        value={settings.apiflashKey || ''}
+                        onChange={e => setSettings({...settings, apiflashKey: e.target.value})}
+                        placeholder="ApiFlash Key"
+                      />
+                    </div>
                   </div>
                </div>
             </div>
@@ -196,13 +209,13 @@ export const SettingsPage: React.FC = () => {
 
         {/* Email Tab */}
         {activeTab === 'email' && (
-          <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 space-y-6 shadow-xl">
-            <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sender Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">From Name</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 text-sm"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                   value={settings.emailConfig.fromName}
                   onChange={e => setSettings({
                     ...settings, 
@@ -211,10 +224,10 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sender Email</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">From Email</label>
                 <input
                   type="email"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 text-sm"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                   value={settings.emailConfig.fromEmail}
                   onChange={e => setSettings({
                     ...settings, 
@@ -225,15 +238,15 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Sending Channel</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Sending Method</label>
               <div className="grid grid-cols-3 gap-4">
                 {['gmail', 'resend', 'custom_smtp'].map((provider) => (
                   <label 
                     key={provider}
-                    className={`border rounded-xl p-4 cursor-pointer flex items-center justify-center gap-2 capitalize transition-all ${
+                    className={`border rounded-lg p-3 cursor-pointer flex items-center justify-center gap-2 capitalize ${
                       settings.emailConfig.provider === provider 
-                        ? 'bg-blue-900/20 border-blue-600 text-blue-400 font-bold' 
-                        : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
+                        ? 'bg-brand-50 border-brand-500 text-brand-700 font-medium' 
+                        : 'border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     <input 
@@ -253,11 +266,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {settings.emailConfig.provider === 'resend' && (
-              <div className="animate-in fade-in slide-in-from-top-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Resend API Key</label>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Resend API Key</label>
                 <input
                   type="password"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 font-mono text-sm"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                   placeholder="re_123..."
                   value={settings.emailConfig.resendApiKey || ''}
                   onChange={e => setSettings({
@@ -272,29 +285,29 @@ export const SettingsPage: React.FC = () => {
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
-          <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 space-y-6 shadow-xl">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Your Full Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 text-sm"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                 value={profile.name}
                 onChange={e => setProfile({...profile, name: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Agency Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Agency/Business Name</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none text-slate-200 text-sm"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none"
                 value={profile.businessName}
                 onChange={e => setProfile({...profile, businessName: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Agent Persona / Bio</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bio / Pitch Intro</label>
               <textarea
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg outline-none h-32 text-slate-200 text-sm resize-none"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none h-24"
                 value={profile.bio}
                 onChange={e => setProfile({...profile, bio: e.target.value})}
               />
@@ -304,62 +317,62 @@ export const SettingsPage: React.FC = () => {
 
         {/* Data Tab */}
         {activeTab === 'data' && (
-          <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 space-y-8 shadow-xl">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="p-6 border border-slate-800 bg-slate-950 rounded-xl hover:border-slate-700 transition-colors">
-                 <div className="flex items-center gap-3 mb-4">
-                   <div className="p-2 bg-blue-900/20 rounded-lg">
-                     <Download size={20} className="text-blue-400"/>
+               <div className="p-6 border border-slate-200 rounded-lg hover:shadow-md transition-shadow">
+                 <div className="flex items-center gap-3 mb-3">
+                   <div className="p-2 bg-blue-100 rounded-lg">
+                     <Download size={20} className="text-blue-600"/>
                    </div>
-                   <h3 className="font-bold text-slate-200">Export Backup</h3>
+                   <h3 className="font-bold text-slate-900">Export Backup</h3>
                  </div>
-                 <p className="text-sm text-slate-500 mb-6">
-                   Download a JSON snapshot of all system data.
+                 <p className="text-sm text-slate-500 mb-4">
+                   Download a JSON file containing all businesses, settings, and profile data.
                  </p>
                  <button
                    type="button"
                    onClick={handleExport}
-                   className="w-full py-2 border border-blue-900/50 text-blue-400 font-bold rounded-lg hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2 text-sm"
+                   className="w-full py-2 border border-blue-600 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
                  >
-                   <Download size={14}/> Download JSON
+                   <Download size={16}/> Download Data
                  </button>
                </div>
 
-               <div className="p-6 border border-slate-800 bg-slate-950 rounded-xl hover:border-slate-700 transition-colors">
-                 <div className="flex items-center gap-3 mb-4">
-                   <div className="p-2 bg-green-900/20 rounded-lg">
-                     <Upload size={20} className="text-green-400"/>
+               <div className="p-6 border border-slate-200 rounded-lg hover:shadow-md transition-shadow">
+                 <div className="flex items-center gap-3 mb-3">
+                   <div className="p-2 bg-green-100 rounded-lg">
+                     <Upload size={20} className="text-green-600"/>
                    </div>
-                   <h3 className="font-bold text-slate-200">Import Backup</h3>
+                   <h3 className="font-bold text-slate-900">Import Backup</h3>
                  </div>
-                 <p className="text-sm text-slate-500 mb-6">
-                   Restore system state from a previous snapshot.
+                 <p className="text-sm text-slate-500 mb-4">
+                   Restore data from a previously exported JSON file.
                  </p>
-                 <label className="w-full py-2 bg-green-900/20 text-green-400 border border-green-900/50 font-bold rounded-lg hover:bg-green-900/30 transition-colors flex items-center justify-center gap-2 cursor-pointer text-sm">
-                   <Upload size={14}/> 
+                 <label className="w-full py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                   <Upload size={16}/> 
                    <span>Select File</span>
                    <input type="file" accept=".json" onChange={handleImport} className="hidden"/>
                  </label>
                </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-800">
-               <div className="p-6 border border-red-900/30 bg-red-950/10 rounded-xl flex items-center justify-between">
-                 <div className="flex items-start gap-4">
-                    <AlertCircle className="text-red-500 mt-1" size={20}/>
+            <div className="pt-6 border-t border-slate-200">
+               <div className="p-6 border border-red-200 bg-red-50 rounded-lg flex items-center justify-between">
+                 <div className="flex items-start gap-3">
+                    <AlertCircle className="text-red-600 mt-1" size={20}/>
                     <div>
-                      <h3 className="font-bold text-red-500">System Reset</h3>
-                      <p className="text-sm text-red-400/70 mt-1">
-                        Irreversible deletion of all gathered intelligence.
+                      <h3 className="font-bold text-red-900">Danger Zone</h3>
+                      <p className="text-sm text-red-700 mt-1">
+                        Permanently delete all business data.
                       </p>
                     </div>
                  </div>
                  <button
                    type="button"
                    onClick={handleClear}
-                   className="px-4 py-2 bg-red-950/30 border border-red-900/50 text-red-400 font-bold rounded-lg hover:bg-red-900/50 transition-colors flex items-center gap-2 text-sm"
+                   className="px-4 py-2 bg-white border border-red-300 text-red-700 font-medium rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
                  >
-                   <Trash2 size={14}/> Format Database
+                   <Trash2 size={16}/> Clear Data
                  </button>
                </div>
             </div>

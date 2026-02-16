@@ -1,5 +1,45 @@
+
 import { getSettings } from './storage';
 import { performSinglePassScan } from './api';
+
+export async function captureScreenshotOne(url: string): Promise<string> {
+  const settings = getSettings();
+  const accessKey = settings.screenshotOneAccessKey;
+
+  if (!accessKey) {
+     const result = await performSinglePassScan(url);
+     if (result.success && result.data?.screenshot) return result.data.screenshot;
+     throw new Error('ScreenshotOne Access Key missing and fallback failed');
+  }
+
+  const params = new URLSearchParams({
+    access_key: accessKey,
+    url: url,
+    full_page: 'true',
+    response_type: 'image', // Assuming image return based on docs
+    format: 'jpg',
+    image_quality: '80',
+    block_ads: 'true',
+    block_cookie_banners: 'true',
+    block_trackers: 'true',
+    wait_for_selector: 'body'
+  });
+
+  const apiUrl = `https://api.screenshotone.com/take?${params.toString()}`;
+
+  const response = await fetch(apiUrl);
+
+  if (!response.ok) {
+    throw new Error(`ScreenshotOne failed: ${response.status} ${response.statusText}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const base64 = btoa(
+    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  );
+
+  return `data:image/jpeg;base64,${base64}`;
+}
 
 export async function captureScreenshotAPI(url: string): Promise<string> {
   const settings = getSettings();
