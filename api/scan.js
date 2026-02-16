@@ -3,7 +3,6 @@ import puppeteer from 'puppeteer-core';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-// Optimize chromium for serverless environment
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -19,8 +18,6 @@ export default async function handler(req, res) {
   try {
     const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
     
-    // Configure for serverless environment (AWS Lambda / Vercel)
-    // Sometimes local executables are needed if running locally
     const executablePath = await chromium.executablePath();
 
     browser = await puppeteer.launch({
@@ -40,67 +37,74 @@ export default async function handler(req, res) {
     });
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
+    await page.setViewport({ width: 1440, height: 900 });
     
-    // 2. Navigation & Screenshot
-    const startTime = Date.now();
-    const response = await page.goto(formattedUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    const loadTime = Date.now() - startTime;
+    // Increase timeout for heavy sites
+    const timeout = 30000;
+    const response = await page.goto(formattedUrl, { waitUntil: 'domcontentloaded', timeout });
     
+    // Capture data directly from browser context
+    const pageData = await page.evaluate(() => {
+      // Performance metrics
+      const timing = window.performance.timing;
+      const performance = {
+        loadTime: timing.loadEventEnd - timing.navigationStart,
+        domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
+        timeToInteractive: timing.domInteractive - timing.navigationStart
+      };
+
+      // Meta extraction
+      const getMeta = (name) => document.querySelector(`meta[name="${name}"]`)?.getAttribute('content') || '';
+      
+      // Email extraction (simple regex on body)
+      const bodyText = document.body.innerText;
+      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+      const foundEmails = Array.from(new Set(bodyText.match(emailRegex) || []));
+
+      // Link extraction
+      const links = Array.from(document.querySelectorAll('a[href]'))
+        .map(a => a.href)
+        .slice(0, 15); // Top 15 links
+
+      return {
+        performance,
+        title: document.title,
+        description: getMeta('description'),
+        hasViewport: !!document.querySelector('meta[name="viewport"]'),
+        emails: foundEmails,
+        links,
+        html: document.documentElement.outerHTML
+      };
+    });
+
+    // Capture screenshot
     const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 60, fullPage: false });
     const screenshot = `data:image/jpeg;base64,${screenshotBuffer.toString('base64')}`;
 
-    const content = await page.content();
-    const $ = cheerio.load(content);
-
-    // 3. Tech Stack & Headers Analysis
+    // Process Tech Stack & Headers (Server-side)
     const headers = response.headers();
     const techStack = {
       frontend: [],
       backend: [],
       cms: [],
-      server: headers['server'] || 'Unknown'
+      server: headers['server'] || 'Unknown',
+      detectedVersions: {}
     };
 
-    // React Detection
-    if ($('[data-reactroot]').length > 0 || content.includes('_reactInternalInstance')) techStack.frontend.push('React');
-    if ($('script[src*="next"]').length > 0 || $('#__next').length > 0) techStack.frontend.push('Next.js');
-    if ($('script[src*="wp-content"]').length > 0 || headers['x-powered-by']?.includes('WP')) techStack.cms.push('WordPress');
-    
-    // 4. Active Security Scanning
+    const htmlLower = pageData.html.toLowerCase();
+    if (htmlLower.includes('wp-content')) techStack.cms.push('WordPress');
+    if (htmlLower.includes('shopify')) techStack.cms.push('Shopify');
+    if (htmlLower.includes('wix')) techStack.cms.push('Wix');
+    if (htmlLower.includes('react')) techStack.frontend.push('React');
+    if (htmlLower.includes('next.js') || htmlLower.includes('__next')) techStack.frontend.push('Next.js');
+    if (htmlLower.includes('vue')) techStack.frontend.push('Vue.js');
+    if (htmlLower.includes('bootstrap')) techStack.frontend.push('Bootstrap');
+    if (htmlLower.includes('tailwind')) techStack.frontend.push('Tailwind CSS');
+
+    // Quick Security Checks
     const vulnerabilities = [];
-    const scanEndpoints = async (path, name, severity) => {
-      try {
-        const checkUrl = `${formattedUrl.replace(/\/$/, '')}${path}`;
-        const check = await axios.get(checkUrl, { timeout: 3000, validateStatus: () => true });
-        if (check.status === 200) {
-          return {
-            name: `${name} Exposed`,
-            severity,
-            description: `The path ${path} is publicly accessible.`,
-            exploitScenario: `Attackers can access ${name} to gather sensitive information or launch attacks.`,
-            remediation: `Restrict access to ${path} via .htaccess or web server config.`
-          };
-        }
-      } catch (e) { return null; }
-      return null;
-    };
-
-    // Run active checks in parallel
-    const securityChecks = [
-      scanEndpoints('/.env', 'Environment Variables', 'CRITICAL'),
-      scanEndpoints('/.git/config', 'Git Config', 'CRITICAL'),
-      scanEndpoints('/wp-login.php', 'WordPress Login', 'MEDIUM'),
-      scanEndpoints('/xmlrpc.php', 'XML-RPC', 'HIGH'),
-      scanEndpoints('/composer.json', 'Composer Dependencies', 'LOW'),
-      scanEndpoints('/package.json', 'NPM Dependencies', 'LOW')
-    ];
-
-    const results = await Promise.all(securityChecks);
-    results.filter(r => r).forEach(r => vulnerabilities.push(r));
-
-    // Header Checks
-    if (!headers['strict-transport-security']) {
+    
+    if (!headers['strict-transport-security'] && formattedUrl.startsWith('https')) {
       vulnerabilities.push({
         name: 'Missing HSTS',
         severity: 'LOW',
@@ -109,7 +113,7 @@ export default async function handler(req, res) {
         remediation: 'Enable HSTS header.'
       });
     }
-    
+
     if (headers['x-powered-by']) {
       vulnerabilities.push({
         name: 'Information Leakage',
@@ -124,16 +128,25 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      screenshot,
-      loadTime,
-      techStack,
-      headers: {
-        xFrameOptions: !!headers['x-frame-options'],
-        contentSecurityPolicy: !!headers['content-security-policy'],
-        strictTransportSecurity: !!headers['strict-transport-security'],
-      },
-      vulnerabilities,
-      rawHtml: content.substring(0, 5000) // First 5k chars for AI analysis
+      data: {
+        screenshot,
+        html: pageData.html.substring(0, 15000), // Increased limit for AI
+        performance: pageData.performance,
+        meta: {
+          title: pageData.title,
+          description: pageData.description,
+          hasViewport: pageData.hasViewport,
+          hasSSL: formattedUrl.startsWith('https')
+        },
+        emails: pageData.emails,
+        links: pageData.links,
+        techStack,
+        vulnerabilities,
+        headers: {
+          xFrameOptions: !!headers['x-frame-options'],
+          strictTransportSecurity: !!headers['strict-transport-security']
+        }
+      }
     });
 
   } catch (error) {
@@ -141,8 +154,8 @@ export default async function handler(req, res) {
     console.error("Puppeteer Error:", error);
     res.status(500).json({ 
       success: false, 
-      error: error.message,
-      screenshot: null
+      error: error.message || 'Unknown scan error',
+      details: error.toString()
     });
   }
 }

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, AlertTriangle, Shield, Smartphone, Monitor, Loader2, Lock, Search, Code, Terminal, Server, Layers, Globe, Eye, History, Bug, Skull, Zap, Gauge } from 'lucide-react';
 import { getBusinesses, updateBusiness } from '../services/storage';
-import { performFullAudit } from '../services/api';
-import { runLighthouseAudit, extractRelevantLinks } from '../services/simulation';
-import { analyzeWebsiteWithGemini, findAndVerifyEmail, analyzeBusinessFromSearch } from '../services/geminiService';
-import { Business, BusinessStatus, AnalysisResult, LighthouseData } from '../types';
+import { performSinglePassScan, withTimeout } from '../services/api';
+import { analyzeWebsiteComplete, analyzeBusinessFromSearch } from '../services/geminiService';
+import { Business, BusinessStatus, AnalysisResult } from '../types';
 
 const TechBadge: React.FC<{ label: string }> = ({ label }) => (
   <span className="px-2 py-1 bg-slate-800 text-slate-200 text-xs rounded font-mono border border-slate-700">
@@ -23,33 +22,21 @@ const VulnerabilityCard = ({ vuln }: { vuln: any }) => (
       </span>
     </div>
     <p className="text-xs text-red-700 mb-2">{vuln.description}</p>
-    <div className="bg-white p-2 rounded border border-red-100">
-       <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase mb-1">
-         <Skull size={12} className="text-slate-800" /> Potential Exploit
-       </div>
-       <p className="text-xs text-slate-800 font-mono italic">"{vuln.exploitScenario}"</p>
-    </div>
   </div>
 );
 
 const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screenshot?: string }) => (
   <div className="mt-4 bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-    {/* Tech Stack Header */}
     <div className="bg-slate-900 p-4 border-b border-slate-800">
       <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
-        <Server size={14} /> Full Stack Enumeration
+        <Server size={14} /> Technology Stack
       </h4>
       <div className="flex flex-wrap gap-2">
          {result.techStack?.frontend?.map((t: string) => <TechBadge key={t} label={t} />)}
          {result.techStack?.cms?.map((t: string) => <TechBadge key={t} label={t} />)}
          {result.techStack?.server && <TechBadge label={result.techStack.server} />}
-         {Object.entries(result.techStack?.detectedVersions || {}).map(([soft, ver]) => (
-            <span key={soft} className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded font-mono border border-blue-800">
-              {soft}: {ver as string}
-            </span>
-         ))}
          {(!result.techStack?.frontend?.length && !result.techStack?.cms?.length) && (
-           <span className="text-slate-500 text-xs italic">No explicit technologies detected via headers/DOM.</span>
+           <span className="text-slate-500 text-xs italic">No explicit technologies detected.</span>
          )}
       </div>
     </div>
@@ -58,7 +45,7 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
       <div className="lg:w-1/3 shrink-0 space-y-4">
          {screenshot ? (
            <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden bg-white relative group">
-              <img src={screenshot} alt="Site Screenshot" className="w-full" />
+              <img src={screenshot} alt="Site Screenshot" className="w-full object-cover" />
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
                 <Eye size={16} className="mr-2" /> Captured Viewport
               </div>
@@ -67,16 +54,15 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
            <div className="h-48 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs border border-slate-300">
              <div className="text-center p-4">
                <Eye size={24} className="mx-auto mb-2 opacity-50" />
-               Visual Scan Failed<br/>(Text Analysis Only)
+               No Visual Data
              </div>
            </div>
          )}
 
-         {/* Security Summary */}
          {result.security && (
            <div>
              <h5 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-2">
-               <Shield size={12} /> Active Vulnerability Scan
+               <Shield size={12} /> Security Scan
              </h5>
              <div className="space-y-1">
                {result.security.vulnerabilities.map((v, i) => (
@@ -84,7 +70,7 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
                ))}
                {result.security.vulnerabilities.length === 0 && (
                  <div className="text-xs text-green-600 bg-green-50 p-2 rounded border border-green-100 flex items-center gap-2">
-                   <CheckCircle2 size={12}/> No active threats detected on scanned paths.
+                   <CheckCircle2 size={12}/> System Secure
                  </div>
                )}
              </div>
@@ -93,22 +79,21 @@ const AnalysisDetail = ({ result, screenshot }: { result: AnalysisResult, screen
       </div>
       
       <div className="flex-1 space-y-4">
-        {/* Strategy Pivot Alert */}
         {result.strategy?.focus === 'SECURITY' && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
             <div className="flex items-center gap-2 text-red-800 font-bold mb-1">
               <Shield size={18} />
-              SECURITY FOCUS RECOMMENDED
+              SECURITY RISK DETECTED
             </div>
-            <p className="text-sm text-red-700 mb-2">
-              Critical vulnerabilities found. The generated pitch will leverage these exploits to create urgency.
+            <p className="text-sm text-red-700">
+              Vulnerabilities found. Recommended strategy is to pitch immediate remediation.
             </p>
           </div>
         )}
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
           <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-orange-500" /> AI Analysis Findings
+            <AlertTriangle size={16} className="text-orange-500" /> Key Findings
           </h4>
           <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
             {result.criticalIssues.map((issue, i) => (
@@ -150,141 +135,82 @@ export const Analysis: React.FC = () => {
 
   const handleAnalyze = async (business: Business) => {
     setAnalyzingId(business.id);
-    setLogs([]); // Clear logs for new scan
+    setLogs([]);
     const logHistory: string[] = [];
+    
     const logAndSave = (msg: string) => {
       const fullMsg = `[${new Date().toLocaleTimeString()}] ${msg}`;
       logHistory.push(fullMsg);
       addLog(msg);
     };
 
-    logAndSave(`Target Acquired: ${business.website}`);
+    logAndSave(`Target: ${business.website}`);
 
     try {
-      // Step 1: Initial Backend Scan for HTML & Security
-      logAndSave("Connecting to backend for security scan...");
-      const auditData = await performFullAudit(business.website);
+      // Step 1: Single-pass Scan
+      logAndSave("Launching scan agent (max 30s)...");
       
-      let htmlToScan = auditData.rawHtml || "";
-
-      // HANDLE FAILURE: If backend audit fails, try fallback analysis
-      if (auditData.status === 'error' || (!htmlToScan && auditData.status !== 'success')) {
-         logAndSave(`WARN: Direct scan failed (${auditData.reason || "unknown"}). Switching to Search Fallback...`);
+      const scanResult = await withTimeout(
+        performSinglePassScan(business.website),
+        40000, 
+        "Website Scan"
+      );
+      
+      if (!scanResult.success || !scanResult.data) {
+         logAndSave(`WARN: Direct scan failed (${scanResult.error}). Switching to Search Fallback...`);
          
-         try {
-           const fallbackAnalysis = await analyzeBusinessFromSearch(business);
-           logAndSave("Success: Analysis inferred via Google Search.");
-           
-           updateBusiness(business.id, {
-             status: BusinessStatus.ANALYZED,
-             analysis: fallbackAnalysis,
-             logs: logHistory,
-           });
-           setAnalyzingId(null);
-           return;
-         } catch (fallbackError: any) {
-           throw new Error("Analysis failed completely: " + fallbackError.message);
-         }
+         const fallbackAnalysis = await analyzeBusinessFromSearch(business);
+         logAndSave("Success: Analysis inferred via Google Search.");
+         
+         updateBusiness(business.id, {
+           status: BusinessStatus.ANALYZED,
+           analysis: fallbackAnalysis,
+           logs: logHistory,
+         });
+         return;
       }
       
-      logAndSave("Security scan complete. Extracting site map...");
+      logAndSave(`✓ Captured Visuals & HTML (${scanResult.data.html.length} chars)`);
+      logAndSave(`✓ Metrics: Load ${Math.round(scanResult.data.performance.loadTime)}ms`);
+
+      if (scanResult.data.emails.length > 0) {
+        logAndSave(`✓ Contact Found: ${scanResult.data.emails[0]}`);
+      }
       
-      // Step 2: Extract Relevant Links
-      const internalLinks = extractRelevantLinks(htmlToScan, business.website);
-      logAndSave(`Found ${internalLinks.length} relevant internal pages to audit.`);
-
-      // Step 3: Run Lighthouse Audits (External Google Service)
-      // We run this even if 'auditData' was partial, provided we have a URL
-      const pagesToAudit = [business.website, ...internalLinks];
-      const lighthouseResults: LighthouseData[] = [];
-
-      for (const url of pagesToAudit) {
-        logAndSave(`Running Lighthouse Audit on: ${url}...`);
-        try {
-          const result = await runLighthouseAudit(url);
-          if (result.lighthouse.screenshot) {
-            lighthouseResults.push(result.lighthouse);
-            logAndSave(`Captured screenshot & metrics for ${url}`);
-          } else {
-            logAndSave(`Failed to capture visual data for ${url}`);
-          }
-        } catch (e) {
-          logAndSave(`Skip: Lighthouse failed for ${url}`);
-        }
-      }
-
-      if (lighthouseResults.length === 0 && !htmlToScan) {
-        // Double check failure condition
-         throw new Error("No data could be gathered (Visual or Textual).");
-      }
-
-      // Step 4: Email Discovery
-      logAndSave("Scanning DOM for contact vectors...");
-      const contactInfo = await findAndVerifyEmail(business, htmlToScan);
+      // Step 2: AI Analysis
+      logAndSave("Processing with Gemini 2.5...");
       
-      if (contactInfo) {
-        logAndSave(`CONTACT: ${contactInfo.email} (Source: ${contactInfo.source})`);
-      }
-
-      // Step 5: AI Synthesis (Gemini)
-      logAndSave("Synthesizing multi-page audit data with Gemini 2.5...");
+      const analysis = await withTimeout(
+        analyzeWebsiteComplete(business, scanResult.data),
+        60000,
+        "AI Analysis"
+      );
       
-      const primaryScreenshot = lighthouseResults[0]?.screenshot;
-
-      const analysis = await analyzeWebsiteWithGemini(business, lighthouseResults, htmlToScan);
-      
-      // Inject Main Page Lighthouse Data into Analysis for record keeping
-      if (lighthouseResults[0]) {
-        analysis.lighthouse = lighthouseResults[0];
-        analysis.performanceScore = lighthouseResults[0].performance;
-      }
-
-      // Merge Active Scan Vulnerabilities into Gemini's result (if any found in backend audit)
-      if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
-          analysis.security = {
-              ...analysis.security,
-              riskLevel: auditData.vulnerabilities.some((v: any) => v.severity === 'CRITICAL') ? 'CRITICAL' : 'HIGH',
-              vulnerabilities: [
-                  ...auditData.vulnerabilities,
-                  ...(analysis.security?.vulnerabilities || [])
-              ]
-          } as any;
-          
-          analysis.strategy = {
-              ...analysis.strategy,
-              focus: 'SECURITY',
-              rationale: 'Active vulnerabilities detected. Immediate patch required.'
-          } as any;
-      }
-
-      // Merge Tech Stack
-      if (auditData.techStack) {
-          analysis.techStack = {
-              frontend: Array.from(new Set([...(analysis.techStack?.frontend || []), ...(auditData.techStack.frontend || [])])),
-              backend: Array.from(new Set([...(analysis.techStack?.backend || []), ...(auditData.techStack.backend || [])])),
-              cms: Array.from(new Set([...(analysis.techStack?.cms || []), ...(auditData.techStack.cms || [])])),
-              analytics: Array.from(new Set([...(analysis.techStack?.analytics || []), ...(auditData.techStack.analytics || [])])),
-              hosting: Array.from(new Set([...(analysis.techStack?.hosting || []), ...(auditData.techStack.hosting || [])])),
-              server: auditData.techStack.server || analysis.techStack?.server,
-              detectedVersions: { ...analysis.techStack?.detectedVersions, ...auditData.techStack.detectedVersions }
-          };
-      }
-
-      logAndSave("Report generated. Saving to local database.");
+      logAndSave(`✓ Score: ${analysis.overallScore}/100`);
       
       updateBusiness(business.id, {
         status: BusinessStatus.ANALYZED,
         analysis: analysis,
-        screenshot: primaryScreenshot, 
+        screenshot: scanResult.data.screenshot,
+        email: scanResult.data.emails[0] || business.email,
         logs: logHistory,
-        email: contactInfo?.email || business.email,
-        contactInfo: contactInfo || undefined
+        contactInfo: scanResult.data.emails[0] ? {
+            email: scanResult.data.emails[0],
+            source: 'scraped',
+            verified: true,
+            confidenceScore: 1
+        } : undefined
       });
       
+      logAndSave("Complete.");
+
     } catch (e: any) {
       console.error(e);
       logAndSave(`CRITICAL FAIL: ${e.message}`);
-      updateBusiness(business.id, { logs: logHistory });
+      updateBusiness(business.id, { 
+        logs: logHistory,
+        status: BusinessStatus.DISCOVERED // Reset status on failure
+      });
     } finally {
       setTimeout(() => setAnalyzingId(null), 1000);
     }
@@ -301,7 +227,7 @@ export const Analysis: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Deep Analysis Lab</h2>
-        <p className="text-slate-500 mt-1">Full-stack introspection and security auditing</p>
+        <p className="text-slate-500 mt-1">Single-pass full-stack introspection</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -326,16 +252,6 @@ export const Analysis: React.FC = () => {
                       <a href={business.website} target="_blank" className="text-sm text-brand-600 hover:underline flex items-center gap-1">
                         {business.website} <Globe size={12}/>
                       </a>
-                      {business.contactInfo?.email && (
-                          <div className="flex items-center gap-1 mt-1">
-                             <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{business.contactInfo.email}</span>
-                             {business.contactInfo.verified && (
-                               <span title="Verified">
-                                 <CheckCircle2 size={12} className="text-green-500" />
-                               </span>
-                             )}
-                          </div>
-                      )}
                     </div>
                   </div>
 
@@ -343,7 +259,7 @@ export const Analysis: React.FC = () => {
                      renderLogs(logs)
                   ) : !business.analysis ? (
                     <button onClick={() => handleAnalyze(business)} className="bg-slate-900 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-slate-800 flex items-center gap-2 shadow-lg shadow-slate-200/50">
-                      <Play size={16} /> Full Audit
+                      <Play size={16} /> Start Scan
                     </button>
                   ) : (
                     <div className="flex items-center gap-4">
@@ -357,7 +273,7 @@ export const Analysis: React.FC = () => {
                   )}
                 </div>
 
-                {business.analysis && !business.analysis.interventionRequired && (
+                {business.analysis && (
                   <AnalysisDetail result={business.analysis} screenshot={business.screenshot} />
                 )}
               </div>
